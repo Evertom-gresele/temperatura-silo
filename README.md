@@ -92,7 +92,7 @@
                 bevelEnabled: false
             });
             textGeometry.computeBoundingBox();
-            textGeometry.translate( - textGeometry.boundingBox.max.x / 2, 0, 0 ); // Centraliza o texto horizontalmente
+            // textGeometry.translate( - textGeometry.boundingBox.max.x / 2, 0, 0 ); // Removido ou comentado
 
             const textMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Cor do texto (preto)
             const textMesh = new THREE.Mesh(textGeometry, textMaterial);
@@ -102,8 +102,9 @@
         // Função para criar e posicionar os cabos com base nos dados
         function createSiloCables(data) {
             // Parâmetros para a distribuição de altura
-            const cableHeightUnit = 2;
+            const cableHeightUnit = 4; // Dobrando o espaçamento entre os pontos
             const cableWidth = 2;
+            const textHorizontalOffset = 1.5; // Ajuste este valor para mover o texto para o lado (um pouco mais que metade da largura do cabo)
 
             const distribuicao = data.distribuicaoCabos[0];
             const alturaCabos = data.alturaCabos;
@@ -157,8 +158,9 @@
                                 // Adiciona o texto da temperatura ao lado do segmento
                                 if (loadedFont) {
                                     const textMesh = createTemperatureText(temp.toString(), loadedFont);
-                                    // Posição do texto: ligeiramente ao lado do segmento
-                                    textMesh.position.set(x + cableWidth * 0.8, (k * cableHeightUnit) + (cableHeightUnit / 2), z);
+                                    // Posição do texto: ajustando para ficar ao lado do cabo
+                                    // Adicionamos a metade da largura do cabo + um offset
+                                    textMesh.position.set(x + cableWidth / 2 + textHorizontalOffset, (k * cableHeightUnit) + (cableHeightUnit / 2), z);
                                     textMesh.name = 'temperatureText';
                                     scene.add(textMesh);
                                 }
@@ -178,6 +180,7 @@
         // ==========================================================
 
         let scene, camera, renderer, controls;
+        let siloMesh, siloBaseCone, siloTopCone; // Variáveis para armazenar os meshes do silo
 
         function init() {
             // Cena
@@ -185,8 +188,8 @@
             scene.background = new THREE.Color(0xf0f0f0);
 
             // Câmera
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 50, 100);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            camera.position.set(0, 100, 200);
 
             // Renderizador
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -198,24 +201,44 @@
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
             controls.screenSpacePanning = false;
-            controls.minDistance = 10;
-            controls.maxDistance = 500;
+            controls.minDistance = 20;
+            controls.maxDistance = 1000;
             controls.maxPolarAngle = Math.PI / 2;
-            controls.target.set(0, 20, 0);
+            controls.target.set(0, 40, 0);
             controls.update();
 
             // Luzes
             const ambientLight = new THREE.AmbientLight(0x404040);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-            directionalLight.position.set(5, 10, 7.5);
+            directionalLight.position.set(5, 20, 15);
             scene.add(directionalLight);
 
             // Eixos (para ajudar na visualização inicial)
-            const axesHelper = new THREE.AxesHelper(100);
+            const axesHelper = new THREE.AxesHelper(200);
             scene.add(axesHelper);
 
-            // Calcular o raio do silo dinamicamente com base nas linhas
+            // ==========================================================
+            //  Criação do Silo e Funis (Atualizado)
+            // ==========================================================
+            const siloMaterial = new THREE.MeshStandardMaterial({
+                color: 0xc0c0c0,
+                transparent: true,
+                opacity: 0.2,
+                side: THREE.DoubleSide
+            });
+
+            // Determinar a altura máxima dos cabos para a altura do cilindro
+            let maxCableHeight = 0;
+            const cableHeightUnit = 4; // Deve ser o mesmo valor definido em createSiloCables
+            for (const caboId in sampleData.alturaCabos) {
+                const currentCableTotalHeight = sampleData.alturaCabos[caboId] * cableHeightUnit;
+                if (currentCableTotalHeight > maxCableHeight) {
+                    maxCableHeight = currentCableTotalHeight;
+                }
+            }
+
+            // Raio do silo dinamicamente com base nas linhas
             const distribuicaoData = sampleData.distribuicaoCabos[0];
             let numLines = 0;
             for (const key in distribuicaoData) {
@@ -224,18 +247,34 @@
                 }
             }
             const siloRadius = ((numLines - 1) * 20) + 20;
+            const coneHeight = 15; // Altura dos cones superior e inferior
+            const coneBaseRadius = siloRadius; // Raio da base dos cones
 
-            // Cilindro de exemplo para representar o silo
-            const siloGeometry = new THREE.CylinderGeometry(siloRadius, siloRadius, 40, 32);
-            const siloMaterial = new THREE.MeshStandardMaterial({
-                color: 0xc0c0c0,
-                transparent: true,
-                opacity: 0.2,
-                side: THREE.DoubleSide
-            });
-            const silo = new THREE.Mesh(siloGeometry, siloMaterial);
-            silo.position.y = 20;
-            scene.add(silo);
+            // Cilindro principal (corpo do silo)
+            const siloGeometry = new THREE.CylinderGeometry(siloRadius, siloRadius, maxCableHeight, 32);
+            siloMesh = new THREE.Mesh(siloGeometry, siloMaterial);
+            siloMesh.position.y = maxCableHeight / 2; // Centraliza o cilindro em sua própria altura
+            siloMesh.name = 'siloCylinder';
+            scene.add(siloMesh);
+
+            // Cone inferior (funil da base)
+            const baseConeGeometry = new THREE.ConeGeometry(coneBaseRadius, coneHeight, 32);
+            siloBaseCone = new THREE.Mesh(baseConeGeometry, siloMaterial);
+            siloBaseCone.position.y = -coneHeight / 2; // Posiciona abaixo do "chão" dos cabos
+            siloBaseCone.rotation.x = Math.PI; // Inverte o cone para baixo
+            siloBaseCone.name = 'siloBaseCone';
+            scene.add(siloBaseCone);
+
+            // Cone superior (topo do silo)
+            const topConeGeometry = new THREE.ConeGeometry(coneBaseRadius, coneHeight, 32);
+            siloTopCone = new THREE.Mesh(topConeGeometry, siloMaterial);
+            siloTopCone.position.y = maxCableHeight + (coneHeight / 2); // Posiciona acima do cilindro
+            siloTopCone.name = 'siloTopCone';
+            scene.add(siloTopCone);
+
+            // ==========================================================
+            // Fim da criação do Silo e Funis
+            // ==========================================================
 
             // Chamada da função para criar os cabos
             createSiloCables(sampleData);
@@ -261,9 +300,7 @@
 
         // Função para receber dados do FlutterFlow (será implementada mais tarde)
         function updateGraphData(data) {
-        // Função para receber dados do FlutterFlow e atualizar o gráfico
-        function updateGraphData(data) {
-            console.log("Dados recebidos do FlutterFlow para atualização:", data);
+            console.log("Dados recebidos do FlutterFlow:", data);
 
             // 1. Remover todos os objetos de cabos e textos existentes da cena
             const objectsToRemove = [];
@@ -280,11 +317,17 @@
                 scene.remove(object);
             });
 
-            // 2. Chamar createSiloCables com os NOVOS dados
-            // NOTA: Ajuste o sampleData para o 'data' real recebido do FlutterFlow
-            createSiloCables(data);
+            // 2. Determinar a nova altura máxima dos cabos para a altura do cilindro
+            let newMaxCableHeight = 0;
+            const cableHeightUnit = 4; // Deve ser o mesmo valor definido em createSiloCables
+            for (const caboId in data.alturaCabos) {
+                const currentCableTotalHeight = data.alturaCabos[caboId] * cableHeightUnit;
+                if (currentCableTotalHeight > newMaxCableHeight) {
+                    newMaxCableHeight = currentCableTotalHeight;
+                }
+            }
 
-            // 3. (Opcional, mas recomendado) Ajustar o tamanho do silo se a distribuição mudar
+            // 3. Atualizar a altura do cilindro principal e a posição dos cones
             const distribuicaoData = data.distribuicaoCabos[0];
             let numLines = 0;
             for (const key in distribuicaoData) {
@@ -293,23 +336,31 @@
                 }
             }
             const newSiloRadius = ((numLines - 1) * 20) + 20;
+            const coneHeight = 15;
 
-            // Encontre o objeto do silo na cena e atualize sua geometria
-            let siloMesh = null;
-            scene.children.forEach(object => {
-                // Assumindo que o silo é o único CylinderGeometry grande ou você pode dar um nome a ele
-                if (object.geometry instanceof THREE.CylinderGeometry && object.position.y === 20) {
-                    siloMesh = object;
-                }
-            });
-
-            if (siloMesh && siloMesh.geometry.parameters.radiusTop !== newSiloRadius) {
-                // Remove a geometria antiga e cria uma nova
-                siloMesh.geometry.dispose();
-                siloMesh.geometry = new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, 40, 32);
-                console.log(`Raio do silo atualizado para: ${newSiloRadius}`);
+            // Atualiza o cilindro principal
+            if (siloMesh) {
+                siloMesh.geometry.dispose(); // Libera a geometria antiga
+                siloMesh.geometry = new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, newMaxCableHeight, 32);
+                siloMesh.position.y = newMaxCableHeight / 2;
+                console.log(`Cilindro atualizado: Raio=${newSiloRadius}, Altura=${newMaxCableHeight}`);
             }
-        }        }
+
+            // Atualiza a posição do cone inferior
+            if (siloBaseCone) {
+                // Se o raio mudar, pode ser necessário recriar o cone, mas apenas a posição Y é suficiente aqui
+                siloBaseCone.position.y = -coneHeight / 2;
+            }
+
+            // Atualiza a posição do cone superior
+            if (siloTopCone) {
+                // Se o raio mudar, pode ser necessário recriar o cone, mas apenas a posição Y é suficiente aqui
+                siloTopCone.position.y = newMaxCableHeight + (coneHeight / 2);
+            }
+
+            // 4. Chamar createSiloCables com os NOVOS dados para desenhar os cabos e textos
+            createSiloCables(data);
+        }
     </script>
 </body>
 </html>
