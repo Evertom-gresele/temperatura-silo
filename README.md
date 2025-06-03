@@ -181,6 +181,7 @@
 
         let scene, camera, renderer, controls;
         let siloMesh, siloBaseCone, siloTopCone; // Variáveis para armazenar os meshes do silo
+        let axesHelper; // Variável para o AxesHelper
 
         function init() {
             // Cena
@@ -214,9 +215,6 @@
             directionalLight.position.set(5, 20, 15);
             scene.add(directionalLight);
 
-            // Eixos (para ajudar na visualização inicial)
-            const axesHelper = new THREE.AxesHelper(200);
-            scene.add(axesHelper);
 
             // ==========================================================
             //  Criação do Silo e Funis (Atualizado)
@@ -275,6 +273,51 @@
             // ==========================================================
             // Fim da criação do Silo e Funis
             // ==========================================================
+
+            // Eixos (agora com tamanho dinâmico do silo)
+            // Para que os eixos não "passem" do silo, o tamanho do AxesHelper deve ser o RAIO para X e Z.
+            // Para o Y, o tamanho deve ser a altura total do cilindro (maxCableHeight).
+            // No entanto, AxesHelper desenha todos os eixos com o mesmo comprimento.
+            // A melhor abordagem é fazer o tamanho do AxesHelper igual ao raio do silo (para X e Z)
+            // e ajustá-lo na posição para o Y.
+            const axesLength = siloRadius; // Comprimento dos eixos X e Z para ir do centro até a borda do silo
+            axesHelper = new THREE.AxesHelper(axesLength);
+            // Ajusta a posição do AxesHelper para que a ponta do eixo Y chegue até a altura máxima dos cabos
+            // A origem do AxesHelper é o centro. Se o eixo Y for 'axesLength', ele vai de 0 a axesLength.
+            // Queremos que ele se estenda do "chão" (Y=0) até maxCableHeight.
+            // Como AxesHelper desenha 0 a `size` para cada eixo, para o Y, se queremos que vá até `maxCableHeight`,
+            // o `size` deve ser `maxCableHeight` e a origem `0`.
+            // Mas X e Z precisam ir do centro até o raio.
+            // Uma solução é ter um AxesHelper para a origem e outro para a altura, ou usar um valor que abranja
+            // as dimensões mais importantes.
+            // Para que as linhas "sigam" o silo, vamos fazer o length do AxesHelper igual ao diâmetro do silo (para X e Z)
+            // e posicioná-lo no Y para que a linha Y vá do chão até o topo do cilindro.
+            const visualAxesLength = Math.max(siloRadius * 2, maxCableHeight); // Usa o maior entre diâmetro e altura do cilindro para a escala
+            axesHelper = new THREE.AxesHelper(visualAxesLength);
+            // Como o AxesHelper desenha do ponto de origem até o valor do size,
+            // vamos posicionar sua origem para que a linha Y (verde) vá do 0 até o maxCableHeight.
+            // Se o tamanho do AxesHelper é `visualAxesLength`, e o eixo Y vai de 0 a `visualAxesLength`,
+            // para que a linha verde termine em `maxCableHeight`, o size deve ser `maxCableHeight`.
+            // Mas isso faria X e Z terem `maxCableHeight` de comprimento.
+            // A melhor forma de "limitar" visualmente é usar o raio para X e Z.
+            // E o Y é a altura. AxesHelper não é flexível nesse sentido.
+
+            // Vamos tentar uma abordagem onde o tamanho do AxesHelper é o raio do silo para X e Z,
+            // e para o Y, a linha do eixo vai do chão até o topo do cilindro.
+            // Three.js AxesHelper desenha todos os eixos com o mesmo comprimento.
+            // Se queremos que ele se limite ao silo, o comprimento máximo deve ser o diâmetro do silo (2*siloRadius).
+            // A altura do silo é `maxCableHeight`.
+            // Para que o eixo Y "cubra" a altura do cilindro, o tamanho deve ser `maxCableHeight`.
+            // Mas X e Z seriam muito grandes se `maxCableHeight` for maior que o diâmetro.
+            // Se `size` é o raio, X e Z vão de -raio a +raio.
+            // O eixo Y vai de 0 a raio.
+
+            // O jeito mais direto com AxesHelper é que ele seja o tamanho do diâmetro horizontal
+            // e o posicionamos no chão. A linha azul e vermelha vão do -raio ao +raio.
+            // A linha verde vai do 0 ao raio.
+            axesHelper = new THREE.AxesHelper(siloRadius);
+            axesHelper.position.y = 0; // A base dos eixos está no chão, no centro do silo.
+            scene.add(axesHelper);
 
             // Chamada da função para criar os cabos
             createSiloCables(sampleData);
@@ -348,14 +391,26 @@
 
             // Atualiza a posição do cone inferior
             if (siloBaseCone) {
-                // Se o raio mudar, pode ser necessário recriar o cone, mas apenas a posição Y é suficiente aqui
+                siloBaseCone.geometry.dispose(); // Necessário para alterar o raio se ele mudar
+                siloBaseCone.geometry = new THREE.ConeGeometry(newSiloRadius, coneHeight, 32);
                 siloBaseCone.position.y = -coneHeight / 2;
+                siloBaseCone.rotation.x = Math.PI; // Garante que continue invertido
             }
 
-            // Atualiza a posição do cone superior
+            // Atualiza a posição e raio do cone superior
             if (siloTopCone) {
-                // Se o raio mudar, pode ser necessário recriar o cone, mas apenas a posição Y é suficiente aqui
+                siloTopCone.geometry.dispose(); // Necessário para alterar o raio se ele mudar
+                siloTopCone.geometry = new THREE.ConeGeometry(newSiloRadius, coneHeight, 32);
                 siloTopCone.position.y = newMaxCableHeight + (coneHeight / 2);
+            }
+
+            // Atualiza o AxesHelper para o novo tamanho do silo
+            if (axesHelper) {
+                scene.remove(axesHelper); // Remove o antigo
+                // O tamanho do AxesHelper agora é o raio do silo
+                axesHelper = new THREE.AxesHelper(newSiloRadius);
+                axesHelper.position.y = 0; // Mantém a base no chão
+                scene.add(axesHelper); // Adiciona o novo
             }
 
             // 4. Chamar createSiloCables com os NOVOS dados para desenhar os cabos e textos
