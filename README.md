@@ -28,7 +28,7 @@
         // Configurações do silo
         const cableSpacing = 2; // Espaçamento entre cabos na circunferência
         const pointSpacing = 1; // Espaçamento vertical entre pontos de temperatura
-        const coneHeight = 3; // Altura dos cones superior e inferior
+        const coneHeight = 3; // Altura dos cones superior e inferior (base do silo está em y=0)
 
         // Mapa de cores para interpolação de temperaturas
         const colorMap = [
@@ -66,7 +66,6 @@
             const leiturasTemperatura = parsedData.leiturasTemperatura;
 
             let currentCableIndex = 0; // Índice global do cabo
-            let newMaxCableHeight = 0; // Max altura dos cabos em metros
             let newSiloRadius = 0; // Raio do silo com base nos cabos
 
             // Calcular o novo raio do silo baseado no número de cabos
@@ -79,17 +78,6 @@
             }
             // Se não houver cabos, defina um raio padrão para evitar divisão por zero
             newSiloRadius = maxCablesInAnyLine > 0 ? (maxCablesInAnyLine * cableSpacing) / (2 * Math.PI) : 5; 
-
-
-            // Determinar a altura máxima dos cabos
-            for (const caboKey in alturaCabos) {
-                if (alturaCabos[caboKey] > newMaxCableHeight) {
-                    newMaxCableHeight = alturaCabos[caboKey];
-                }
-            }
-
-            // Garante que o silo tenha uma altura mínima se não houver cabos
-            if (newMaxCableHeight === 0) newMaxCableHeight = 10; 
 
             // Criar cabos para cada linha
             for (let i = 1; i <= 5; i++) { // Loop para linha_1 a linha_5
@@ -151,10 +139,6 @@
                     }
                 }
             }
-
-            // Retorna o raio e a altura máxima para que updateGraphData possa usar para ajustar o silo
-            // Estes retornos são agora processados dentro de updateGraphData e não são mais usados aqui.
-            // return { newSiloRadius, newMaxCableHeight }; 
         }
 
         // ==========================================================
@@ -198,12 +182,42 @@
                 console.log("Fonte carregada.");
             });
             
-            // Adiciona o AxesHelper inicial (será ajustado em updateGraphData)
-            axesHelper = new THREE.AxesHelper(10); // Tamanho inicial arbitrário
-            axesHelper.position.y = 0;
+            // *** DESENHA UM SILO PADRÃO NA INICIALIZAÇÃO ***
+            // Isso garante que siloMesh, siloBaseCone, siloTopCone e axesHelper
+            // sejam definidos e adicionados à cena antes de updateGraphData ser chamado.
+            const initialRadius = 5; // Raio padrão
+            const initialCylinderHeight = 10; // Altura do cilindro padrão (sem os cones)
+            const siloMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, transparent: true, opacity: 0.7 });
+
+            // Cilindro do silo
+            siloMesh = new THREE.Mesh(new THREE.CylinderGeometry(initialRadius, initialRadius, initialCylinderHeight, 32), siloMaterial);
+            siloMesh.position.y = initialCylinderHeight / 2; // Centro do cilindro na metade da altura
+            siloMesh.name = 'siloCylinder';
+            scene.add(siloMesh);
+            objectsToRemove.push(siloMesh);
+
+            // Cone inferior
+            siloBaseCone = new THREE.Mesh(new THREE.ConeGeometry(initialRadius, coneHeight, 32), siloMaterial);
+            siloBaseCone.position.y = -coneHeight / 2; // Abaixo da base do cilindro (y=0)
+            siloBaseCone.rotation.x = Math.PI;
+            siloBaseCone.name = 'siloBaseCone';
+            scene.add(siloBaseCone);
+            objectsToRemove.push(siloBaseCone);
+
+            // Cone superior
+            siloTopCone = new THREE.Mesh(new THREE.ConeGeometry(initialRadius, coneHeight, 32), siloMaterial);
+            siloTopCone.position.y = initialCylinderHeight + (coneHeight / 2); // Acima do topo do cilindro
+            siloTopCone.name = 'siloTopCone';
+            scene.add(siloTopCone);
+            objectsToRemove.push(siloTopCone);
+
+            // AxesHelper
+            axesHelper = new THREE.AxesHelper(Math.max(initialRadius, initialCylinderHeight / 2 + coneHeight)); // Ajusta o tamanho
+            axesHelper.position.y = 0; // Na base do silo
             scene.add(axesHelper);
-            objectsToRemove.push(axesHelper); // Para ser removido na primeira atualização
-            
+            objectsToRemove.push(axesHelper);
+            // *** FIM DA ADIÇÃO DE CÓDIGO ***
+
             // Chame a animação
             animate();
         }
@@ -238,7 +252,7 @@
                 });
                 objectsToRemove = []; // Limpa o array
 
-                // Crie um material para o silo (se não existir ou para garantir consistência)
+                // Recria o material do silo, caso tenha sido disposto
                 const siloMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, transparent: true, opacity: 0.7 });
 
                 // Obter novo raio e altura a partir dos dados para o silo
@@ -262,18 +276,21 @@
                         newMaxCableHeight = alturaDoCabo;
                     }
                 }
-                if (newMaxCableHeight === 0) newMaxCableHeight = 10; // Altura mínima para o silo (se não houver cabos)
+                if (newMaxCableHeight === 0) newMaxCableHeight = 10; // Altura mínima para o cilindro do silo
 
-                const totalSiloHeight = newMaxCableHeight * pointSpacing + (coneHeight * 2); // Altura total incluindo cones
+                const newCylinderHeight = newMaxCableHeight * pointSpacing; // Altura do cilindro principal
 
                 // Atualiza/Cria o cilindro do silo
+                // A lógica `if (siloMesh)` aqui se refere à variável global.
+                // Como ele já foi criado em `init()`, esta parte irá atualizar sua geometria e posição.
                 if (siloMesh) {
                     siloMesh.geometry.dispose();
-                    siloMesh.geometry = new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, totalSiloHeight - (coneHeight*2), 32);
-                    siloMesh.position.y = (totalSiloHeight / 2) - coneHeight; // Ajusta posição para o centro do cilindro
-                } else {
-                    siloMesh = new THREE.Mesh(new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, totalSiloHeight - (coneHeight*2), 32), siloMaterial);
-                    siloMesh.position.y = (totalSiloHeight / 2) - coneHeight;
+                    siloMesh.geometry = new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, newCylinderHeight, 32);
+                    siloMesh.position.y = newCylinderHeight / 2; // Centro do cilindro
+                    siloMesh.material = siloMaterial; // Garante que o material é o correto
+                } else { // Caso não tenha sido inicializado (cenário menos provável agora)
+                    siloMesh = new THREE.Mesh(new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, newCylinderHeight, 32), siloMaterial);
+                    siloMesh.position.y = newCylinderHeight / 2;
                     siloMesh.name = 'siloCylinder';
                     scene.add(siloMesh);
                 }
@@ -283,8 +300,9 @@
                 if (siloBaseCone) {
                     siloBaseCone.geometry.dispose();
                     siloBaseCone.geometry = new THREE.ConeGeometry(newSiloRadius, coneHeight, 32);
-                    siloBaseCone.position.y = -coneHeight / 2; // Posição base do cone
+                    siloBaseCone.position.y = -coneHeight / 2; // Posição abaixo da base do cilindro (y=0)
                     siloBaseCone.rotation.x = Math.PI;
+                    siloBaseCone.material = siloMaterial;
                 } else {
                     siloBaseCone = new THREE.Mesh(new THREE.ConeGeometry(newSiloRadius, coneHeight, 32), siloMaterial);
                     siloBaseCone.position.y = -coneHeight / 2;
@@ -298,29 +316,32 @@
                 if (siloTopCone) {
                     siloTopCone.geometry.dispose();
                     siloTopCone.geometry = new THREE.ConeGeometry(newSiloRadius, coneHeight, 32);
-                    siloTopCone.position.y = totalSiloHeight - (coneHeight / 2); // Ajusta para topo do cilindro
+                    siloTopCone.position.y = newCylinderHeight + (coneHeight / 2); // Posição acima do topo do cilindro
+                    siloTopCone.material = siloMaterial;
                 } else {
                     siloTopCone = new THREE.Mesh(new THREE.ConeGeometry(newSiloRadius, coneHeight, 32), siloMaterial);
-                    siloTopCone.position.y = totalSiloHeight - (coneHeight / 2);
+                    siloTopCone.position.y = newCylinderHeight + (coneHeight / 2);
                     siloTopCone.name = 'siloTopCone';
                     scene.add(siloTopCone);
                 }
                 objectsToRemove.push(siloTopCone);
 
+                // A altura total visual do silo (para o AxesHelper)
+                const visualSiloTotalHeight = newCylinderHeight + (coneHeight * 2);
+
                 // Atualiza/Cria o AxesHelper
-                const visualAxesLength = Math.max(newSiloRadius, totalSiloHeight / 2);
+                const visualAxesLength = Math.max(newSiloRadius, visualSiloTotalHeight / 2);
                 if (axesHelper) {
                     scene.remove(axesHelper); 
                     axesHelper.geometry.dispose(); 
                     axesHelper = new THREE.AxesHelper(visualAxesLength);
-                    axesHelper.position.y = 0;
+                    axesHelper.position.y = 0; // Os eixos começam na base do silo (y=0)
                 } else {
                     axesHelper = new THREE.AxesHelper(visualAxesLength);
                     axesHelper.position.y = 0;
                 }
                 scene.add(axesHelper); 
                 objectsToRemove.push(axesHelper);
-
 
                 // 4. Chamar createSiloCables com os NOVOS dados para desenhar os cabos, pontos e textos
                 createSiloCables(parsedData); 
