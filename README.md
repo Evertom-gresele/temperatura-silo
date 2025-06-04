@@ -1,4 +1,4 @@
-<!DOCTYPE 4 html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -16,19 +16,29 @@
     
     <script>
         // ==========================================================
+        //  CONFIGURAÇÃO
+        // ==========================================================
+        const configuracao = {
+            distanciaEntreAneisDeCabos: 20,
+            distanciaDoUltimoAnelDaParede: 20,
+            distanciaEntrePontosDeLeitura: 6,
+            diametroDeExibicaoDaTemperatura: 2,
+            tamanhoDaFonteDeTemperatura: 2, 
+        };
+
+        // ==========================================================
         //  VARIÁVEIS GLOBAIS E FUNÇÕES AUXILIARES
         // ==========================================================
 
         let scene, camera, renderer, controls;
-        let siloMesh, siloBaseCone, siloTopCone;
+        let siloMesh, siloTopCone, siloBasePlate;
         let axesHelper;
-        let loadedFont; // Variável para armazenar a fonte carregada
+        let loadedFont;
         let objectsToRemove = []; // Array para armazenar objetos a serem removidos na atualização
 
         // Configurações do silo
-        const cableSpacing = 2; // Espaçamento entre cabos na circunferência
-        const pointSpacing = 1; // Espaçamento vertical entre pontos de temperatura
-        const coneHeight = 3; // Altura dos cones superior e inferior
+        const coneHeight = 3; // Altura do cone superior
+        const pointSpacing = configuracao.distanciaEntrePontosDeLeitura; // Espaçamento vertical entre pontos de temperatura
 
         // Mapa de cores para interpolação de temperaturas
         const colorMap = [
@@ -39,6 +49,37 @@
             { temp: 50, color: new THREE.Color(0xffa500) }, // Laranja
             { temp: 60, color: new THREE.Color(0xff0000) }  // Vermelho (quente)
         ];
+
+        // DADOS DE EXEMPLO ATUALIZADOS com os valores que você forneceu!
+        const initialParsedData = {
+            distribuicaoCabos: {
+                "linha_1": 1,
+                "linha_2": 3,
+                "linha_3": 0,
+                "linha_4": 0,
+                "linha_5": 0
+            },
+            alturaCabos: {
+                "cabo_1": 16,
+                "cabo_2": 14,
+                "cabo_3": 14,
+                "cabo_4": 14,
+                "cabo_5": 0,
+                "cabo_6": 0,
+                "cabo_7": 0,
+                "cabo_8": 0,
+                "cabo_9": 0,
+                "cabo_10": 0,
+                "cabo_11": 0,
+                "cabo_12": 0,
+            },
+            leiturasTemperatura: {
+                "cabo_1": [10, 12, 15, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
+                "cabo_2": [15, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
+                "cabo_3": [20, 22, 25, 26, 15, 28, 30, 32, 35, 38, 40, 42, 45, 48],
+                "cabo_4": [25, 28, 29, 26, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
+            }
+        };
 
         // Função para interpolar cores baseado na temperatura
         function getColorForTemperature(temp) {
@@ -60,38 +101,42 @@
         }
 
         // Função para criar os cabos e pontos de temperatura
-        function createSiloCables(parsedData) {
+        function createSiloCables(parsedData, siloHeightOffset) {
             const distribuicaoCabos = parsedData.distribuicaoCabos;
             const alturaCabos = parsedData.alturaCabos;
             const leiturasTemperatura = parsedData.leiturasTemperatura;
 
-            let currentCableIndex = 0; // Índice global do cabo
-            let newSiloRadius = 0; // Raio do silo com base nos cabos
-
-            // Calcular o novo raio do silo baseado no número de cabos
-            let maxCablesInAnyLine = 0;
-            for (const lineKey in distribuicaoCabos) {
-                const numCablesInLine = distribuicaoCabos[lineKey];
-                if (numCablesInLine > maxCablesInAnyLine) {
-                    maxCablesInAnyLine = numCablesInLine;
-                }
-            }
-            newSiloRadius = maxCablesInAnyLine > 0 ? (maxCablesInAnyLine * cableSpacing) / (2 * Math.PI) : 5; 
-
-            // Criar cabos para cada linha
-            for (let i = 1; i <= 5; i++) { // Loop para linha_1 a linha_5
+            let currentCableIndex = 0;
+            
+            // Loop para linha_1 a linha_5
+            for (let i = 1; i <= 5; i++) { // i representa o número da linha concêntrica (1 para central, 2 para o primeiro anel, etc.)
                 const numCablesInLine = distribuicaoCabos[`linha_${i}`] || 0;
                 
                 if (numCablesInLine > 0) {
-                    // Calcula o ângulo inicial e o passo angular para esta linha
-                    const startAngle = i * (Math.PI / 6); 
-                    const angleStep = (2 * Math.PI) / numCablesInLine;
+                    let cableRadius;
+                    if (i === 1) { // Linha 1 (central)
+                        cableRadius = 0; // O cabo central fica no raio 0
+                    } else { // Outras linhas formam anéis
+                        // O raio de cada anel é (número da linha - 1) * distanciaEntreAneisDeCabos
+                        cableRadius = (i - 1) * configuracao.distanciaEntreAneisDeCabos;
+                    }
+                    
+                    // Se o raio for 0 (cabo central), definimos um valor minúsculo para evitar divisão por zero na angleStep
+                    const effectiveNumCablesInLine = (cableRadius === 0 && numCablesInLine === 1) ? 1 : numCablesInLine;
+                    const angleStep = (2 * Math.PI) / effectiveNumCablesInLine;
 
                     for (let j = 0; j < numCablesInLine; j++) {
                         currentCableIndex++;
-                        const cableAngle = startAngle + j * angleStep;
-                        const cableX = Math.cos(cableAngle) * newSiloRadius;
-                        const cableZ = Math.sin(cableAngle) * newSiloRadius;
+                        let cableX, cableZ;
+
+                        if (cableRadius === 0) { // Cabo central
+                            cableX = 0;
+                            cableZ = 0;
+                        } else { // Cabos em anéis
+                            const cableAngle = j * angleStep; // Começa sempre do mesmo ângulo para cada anel
+                            cableX = Math.cos(cableAngle) * cableRadius;
+                            cableZ = Math.sin(cableAngle) * cableRadius;
+                        }
 
                         const numPoints = alturaCabos[`cabo_${currentCableIndex}`] || 0;
                         const temperatures = leiturasTemperatura[`cabo_${currentCableIndex}`] || [];
@@ -99,39 +144,41 @@
                         // Cria o cabo (linha)
                         const cableMaterial = new THREE.LineBasicMaterial({ color: 0x888888 });
                         const cableGeometry = new THREE.BufferGeometry().setFromPoints([
-                            new THREE.Vector3(cableX, 0, cableZ), // Começa na base do silo (y=0)
-                            new THREE.Vector3(cableX, numPoints * pointSpacing, cableZ)
+                            new THREE.Vector3(cableX, siloHeightOffset, cableZ),
+                            new THREE.Vector3(cableX, siloHeightOffset + numPoints * pointSpacing, cableZ)
                         ]);
                         const cableLine = new THREE.Line(cableGeometry, cableMaterial);
                         scene.add(cableLine);
-                        objectsToRemove.push(cableLine);
+                        objectsToRemove.push(cableLine); // Adiciona para remoção futura
 
                         // Cria os pontos de temperatura
                         for (let k = 0; k < numPoints; k++) {
                             const temp = temperatures[k] !== undefined ? temperatures[k] : 0;
-                            const pointY = k * pointSpacing; // Posição vertical do ponto
+                            const pointY = siloHeightOffset + k * pointSpacing;
                             const pointColor = getColorForTemperature(temp);
 
-                            const pointGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+                            // Usa o novo campo de configuração para o diâmetro da esfera
+                            const pointGeometry = new THREE.SphereGeometry(configuracao.diametroDeExibicaoDaTemperatura / 2, 16, 16);
                             const pointMaterial = new THREE.MeshBasicMaterial({ color: pointColor });
                             const pointMesh = new THREE.Mesh(pointGeometry, pointMaterial);
                             pointMesh.position.set(cableX, pointY, cableZ);
                             scene.add(pointMesh);
-                            objectsToRemove.push(pointMesh);
+                            objectsToRemove.push(pointMesh); // Adiciona para remoção futura
 
                             // Adicionar texto da temperatura
                             if (loadedFont && temp !== 0) {
                                 const textMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
                                 const textGeometry = new THREE.TextGeometry(temp.toString(), {
                                     font: loadedFont,
-                                    size: 0.5,
+                                    size: configuracao.tamanhoDaFonteDeTemperatura, // Usa o novo campo de configuração para o tamanho da fonte
                                     height: 0.1,
                                 });
                                 textGeometry.computeBoundingBox();
                                 const textWidth = textGeometry.boundingBox.max.x - textGeometry.boundingBox.min.x;
                                 const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-                                textMesh.position.set(cableX + 0.5, pointY, cableZ);
-                                objectsToRemove.push(textMesh);
+                                // Ajuste a posição do texto para ficar ao lado da esfera
+                                textMesh.position.set(cableX + configuracao.diametroDeExibicaoDaTemperatura / 2 + 0.1, pointY, cableZ);
+                                objectsToRemove.push(textMesh); // Adiciona para remoção futura
                                 scene.add(textMesh);
                             }
                         }
@@ -140,6 +187,7 @@
             }
         }
 
+
         // ==========================================================
         //  FUNÇÕES DE INICIALIZAÇÃO E RENDERIZAÇÃO
         // ==========================================================
@@ -147,23 +195,23 @@
         function init() {
             // Cena
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf0f0f0); // Cor de fundo cinza claro
+            scene.background = new THREE.Color(0xf0f0f0);
 
             // Câmera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(20, 20, 20); // Posição inicial da câmera
+            camera.position.set(20, 20, 20);
 
             // Renderizador
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Controles de Órbita - CORREÇÃO: Usar THREE.OrbitControls
+            // Controles de Órbita
             controls = new THREE.OrbitControls(camera, renderer.domElement); 
-            controls.enableDamping = true; // para um movimento mais suave
+            controls.enableDamping = true;
             controls.dampingFactor = 0.25;
             controls.screenSpacePanning = false;
-            controls.maxPolarAngle = Math.PI / 2; // Limita a rotação para não ir abaixo do chão
+            controls.maxPolarAngle = Math.PI / 2;
 
             // Luz Ambiente
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -174,72 +222,77 @@
             directionalLight.position.set(5, 10, 7);
             scene.add(directionalLight);
 
-            // Carregar a fonte (apenas uma vez na inicialização) - CORREÇÃO: Usar THREE.FontLoader
+            // PointLight para clarear o interior
+            const pointLight = new THREE.PointLight(0xffffff, 1.0, 100);
+            pointLight.position.set(0, 10, 0);
+            scene.add(pointLight);
+
+            // Carregar a fonte
             const fontLoader = new THREE.FontLoader();
             fontLoader.load('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/fonts/helvetiker_regular.typeface.json', function (font) {
                 loadedFont = font;
                 console.log("Fonte carregada.");
+                updateGraphData(JSON.stringify(initialParsedData)); 
             });
             
-            // *** DESENHA UM SILO PADRÃO NA INICIALIZAÇÃO ***
-            // Isso garante que siloMesh, siloBaseCone, siloTopCone e axesHelper
-            // sejam definidos e adicionados à cena antes de updateGraphData ser chamado.
-            const initialRadius = 5; // Raio padrão
-            const initialCylinderHeight = 10; // Altura do cilindro padrão (sem os cones)
-            const siloMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, transparent: true, opacity: 0.7 });
+            // Variáveis globais para as dimensões do silo e offset inicial
+            // Serão preenchidas ou atualizadas em updateGraphData
+            let initialSiloRadius = 7; // Valor inicial para garantir que o silo seja visível antes dos dados
+            const basePlateHeight = 1;
 
-            // Cilindro do silo
-            siloMesh = new THREE.Mesh(new THREE.CylinderGeometry(initialRadius, initialRadius, initialCylinderHeight, 32), siloMaterial);
-            siloMesh.position.y = initialCylinderHeight / 2; // Centro do cilindro na metade da altura
+            // Material do silo (cilindro e cone superior)
+            const siloMaterial = new THREE.MeshPhysicalMaterial({ 
+                color: 0xe0e0e0,
+                metalness: 0.6,
+                roughness: 0.3,
+                transparent: true,
+                opacity: 0.15,
+                side: THREE.DoubleSide
+            });
+
+            // Placa da Base do Silo - Criada apenas UMA VEZ na inicialização
+            siloBasePlate = new THREE.Mesh(
+                new THREE.CylinderGeometry(initialSiloRadius + 1, initialSiloRadius + 1, basePlateHeight, 32),
+                new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.7, metalness: 0.1 })
+            );
+            siloBasePlate.position.y = 0;
+            siloBasePlate.name = 'siloBasePlate';
+            scene.add(siloBasePlate);
+
+            // Criar o silo principal (cilindro e cone superior) com valores iniciais
+            siloMesh = new THREE.Mesh(new THREE.CylinderGeometry(initialSiloRadius, initialSiloRadius, 15, 32), siloMaterial);
             siloMesh.name = 'siloCylinder';
             scene.add(siloMesh);
-            objectsToRemove.push(siloMesh);
 
-            // Cone inferior
-            siloBaseCone = new THREE.Mesh(new THREE.ConeGeometry(initialRadius, coneHeight, 32), siloMaterial);
-            siloBaseCone.position.y = -coneHeight / 2; // Abaixo da base do cilindro (y=0)
-            siloBaseCone.rotation.x = Math.PI;
-            siloBaseCone.name = 'siloBaseCone';
-            scene.add(siloBaseCone);
-            objectsToRemove.push(siloBaseCone);
-
-            // Cone superior
-            siloTopCone = new THREE.Mesh(new THREE.ConeGeometry(initialRadius, coneHeight, 32), siloMaterial);
-            siloTopCone.position.y = initialCylinderHeight + (coneHeight / 2); // Acima do topo do cilindro
+            siloTopCone = new THREE.Mesh(new THREE.ConeGeometry(initialSiloRadius, coneHeight, 32), siloMaterial);
             siloTopCone.name = 'siloTopCone';
             scene.add(siloTopCone);
-            objectsToRemove.push(siloTopCone);
 
-            // AxesHelper
-            axesHelper = new THREE.AxesHelper(Math.max(initialRadius, initialCylinderHeight + (coneHeight * 2))); // Ajusta o tamanho para cobrir toda a altura visual
-            axesHelper.position.y = 0; // Na base do silo
+            axesHelper = new THREE.AxesHelper(Math.max(initialSiloRadius * 1.5, 15 + coneHeight));
+            axesHelper.position.y = 0;
             scene.add(axesHelper);
-            objectsToRemove.push(axesHelper);
-            // *** FIM DA ADIÇÃO DE CÓDIGO ***
-
-            // Chame a animação
+            
             animate();
         }
 
         // Função de animação
         function animate() {
             requestAnimationFrame(animate);
-            controls.update(); // apenas necessário se enableDamping estiver ativado
+            controls.update();
             renderer.render(scene, camera);
         }
 
         // Função para atualizar o gráfico com novos dados
         window.updateGraphData = function(data) {
             try {
-                // Tenta remover as aspas extras que o FlutterFlow pode adicionar
                 const cleanedDataString = data.replace(/^"|"$/g, ''); 
                 const parsedData = JSON.parse(cleanedDataString); 
-                console.log("Dados recebidos do FlutterFlow (parsed):", parsedData); // Para depuração
+                console.log("Dados recebidos do FlutterFlow (parsed):", parsedData);
 
-                // 1. Remover objetos antigos (cabos, pontos, textos, e o AxesHelper/siloMesh se eles mudarem de tamanho)
-                objectsToRemove.forEach(obj => {
+                // Remover APENAS cabos, pontos e textos antigos
+                const currentObjectsToRemove = [...objectsToRemove];
+                currentObjectsToRemove.forEach(obj => {
                     scene.remove(obj);
-                    // Dispose de geometria e material para liberar memória
                     if (obj.geometry) obj.geometry.dispose();
                     if (obj.material) {
                         if (Array.isArray(obj.material)) {
@@ -249,106 +302,105 @@
                         }
                     }
                 });
-                objectsToRemove = []; // Limpa o array
+                objectsToRemove = []; // Limpa o array principal após remover todos os objetos dinâmicos
+                
+                // Re-obter o material do silo (para garantir que não foi descartado)
+                const siloMaterial = new THREE.MeshPhysicalMaterial({ 
+                    color: 0xe0e0e0,
+                    metalness: 0.6,
+                    roughness: 0.3,
+                    transparent: true,
+                    opacity: 0.15,
+                    side: THREE.DoubleSide
+                });
 
-                // Recria o material do silo, caso tenha sido disposto
-                const siloMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, transparent: true, opacity: 0.7 });
+                // Obter novo raio e altura a partir dos dados
+                let newMaxCableHeight = 0;
+                let numberOfActiveLines = 0; // Para calcular o raio do silo
 
-                // Obter novo raio e altura a partir dos dados para o silo
-                let newMaxCableHeight = 0; 
-                let newSiloRadius = 0;
-
-                // Calcular o novo raio do silo baseado no número de cabos em distribuicaoCabos
-                let maxCablesInAnyLine = 0;
-                for (const lineKey in parsedData.distribuicaoCabos) {
-                    const numCablesInLine = parsedData.distribuicaoCabos[lineKey];
-                    if (numCablesInLine > maxCablesInAnyLine) {
-                        maxCablesInAnyLine = numCablesInLine;
+                for (let i = 1; i <= 5; i++) {
+                    const numCablesInLine = parsedData.distribuicaoCabos[`linha_${i}`] || 0;
+                    if (numCablesInLine > 0) {
+                        numberOfActiveLines++; // Contamos as linhas ativas
                     }
                 }
-                newSiloRadius = maxCablesInAnyLine > 0 ? (maxCablesInAnyLine * cableSpacing) / (2 * Math.PI) : 5; 
 
-                // Determinar a altura máxima dos cabos (define a altura do cilindro principal)
-                for (const caboKey in parsedData.alturaCabos) {
-                    const alturaDoCabo = parsedData.alturaCabos[caboKey];
-                     if (alturaDoCabo > newMaxCableHeight) {
-                        newMaxCableHeight = alturaDoCabo;
+                let currentCableIndexCheck = 0;
+                for (let i = 1; i <= 5; i++) {
+                    const numCablesInLine = parsedData.distribuicaoCabos[`linha_${i}`] || 0;
+                    for (let j = 0; j < numCablesInLine; j++) {
+                        currentCableIndexCheck++;
+                        const alturaDoCabo = parsedData.alturaCabos[`cabo_${currentCableIndexCheck}`] || 0;
+                        if (alturaDoCabo > newMaxCableHeight) {
+                            newMaxCableHeight = alturaDoCabo;
+                        }
                     }
                 }
-                if (newMaxCableHeight === 0) newMaxCableHeight = 10; // Altura mínima para o cilindro do silo
+                
+                // Garante que a altura mínima do cilindro seja razoável
+                if (newMaxCableHeight === 0) newMaxCableHeight = 10; 
 
-                const newCylinderHeight = newMaxCableHeight * pointSpacing; // Altura do cilindro principal
+                const basePlateHeight = 1; // Já é uma constante global
+                const cylinderOffsetFromBase = basePlateHeight; // Os cabos começam acima da base
+                const newSiloCylinderHeight = newMaxCableHeight * pointSpacing; // A altura do cilindro é baseada na altura máxima dos cabos.
+                                                                                // O offset da base é tratado na posição Y.
 
-                // Atualiza/Cria o cilindro do silo
-                if (siloMesh) {
-                    siloMesh.geometry.dispose();
-                    siloMesh.geometry = new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, newCylinderHeight, 32);
-                    siloMesh.position.y = newCylinderHeight / 2; // Centro do cilindro
-                    siloMesh.material = siloMaterial; // Garante que o material é o correto
-                } else { 
-                    siloMesh = new THREE.Mesh(new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, newCylinderHeight, 32), siloMaterial);
-                    siloMesh.position.y = newCylinderHeight / 2;
-                    siloMesh.name = 'siloCylinder';
-                    scene.add(siloMesh);
+                let currentSiloRadius = 0;
+                if (numberOfActiveLines === 0) {
+                    currentSiloRadius = configuracao.distanciaDoUltimoAnelDaParede; // Raio padrão se não houver cabos
+                } else if (numberOfActiveLines === 1 && parsedData.distribuicaoCabos["linha_1"] === 1) {
+                    // Apenas cabo central: raio do silo = distanciaDoUltimoAnelDaParede (5)
+                    currentSiloRadius = configuracao.distanciaDoUltimoAnelDaParede;
                 }
-                objectsToRemove.push(siloMesh); 
-
-                // Atualiza/Cria o cone inferior
-                if (siloBaseCone) {
-                    siloBaseCone.geometry.dispose();
-                    siloBaseCone.geometry = new THREE.ConeGeometry(newSiloRadius, coneHeight, 32);
-                    siloBaseCone.position.y = -coneHeight / 2; // Posição abaixo da base do cilindro (y=0)
-                    siloBaseCone.rotation.x = Math.PI;
-                    siloBaseCone.material = siloMaterial;
-                } else {
-                    siloBaseCone = new THREE.Mesh(new THREE.ConeGeometry(newSiloRadius, coneHeight, 32), siloMaterial);
-                    siloBaseCone.position.y = -coneHeight / 2;
-                    siloBaseCone.rotation.x = Math.PI;
-                    siloBaseCone.name = 'siloBaseCone';
-                    scene.add(siloBaseCone);
+                 else {
+                    // Raio do último anel de cabos = (numberOfActiveLines - 1) * distanciaEntreAneisDeCabos
+                    // Raio do silo = Raio do último anel + distanciaDoUltimoAnelDaParede
+                    currentSiloRadius = (numberOfActiveLines - 1) * configuracao.distanciaEntreAneisDeCabos + configuracao.distanciaDoUltimoAnelDaParede;
                 }
-                objectsToRemove.push(siloBaseCone);
 
-                // Atualiza/Cria o cone superior
-                if (siloTopCone) {
-                    siloTopCone.geometry.dispose();
-                    siloTopCone.geometry = new THREE.ConeGeometry(newSiloRadius, coneHeight, 32);
-                    siloTopCone.position.y = newCylinderHeight + (coneHeight / 2); // Posição acima do topo do cilindro
-                    siloTopCone.material = siloMaterial;
-                } else {
-                    siloTopCone = new THREE.Mesh(new THREE.ConeGeometry(newSiloRadius, coneHeight, 32), siloMaterial);
-                    siloTopCone.position.y = newCylinderHeight + (coneHeight / 2);
-                    siloTopCone.name = 'siloTopCone';
-                    scene.add(siloTopCone);
-                }
-                objectsToRemove.push(siloTopCone);
+                // Atualiza o cilindro do silo
+                siloMesh.geometry.dispose();
+                siloMesh.geometry = new THREE.CylinderGeometry(currentSiloRadius, currentSiloRadius, newSiloCylinderHeight, 32);
+                siloMesh.position.y = (newSiloCylinderHeight / 2) + basePlateHeight; // Posiciona acima da base
+                siloMesh.material = siloMaterial; // Garante que o material está aplicado
 
-                // A altura total visual do silo (para o AxesHelper)
-                const visualSiloTotalHeight = newCylinderHeight + (coneHeight * 2);
+                // Atualiza o cone superior
+                siloTopCone.geometry.dispose();
+                siloTopCone.geometry = new THREE.ConeGeometry(currentSiloRadius, coneHeight, 32);
+                siloTopCone.position.y = newSiloCylinderHeight + basePlateHeight + (coneHeight / 2);
+                siloTopCone.material = siloMaterial; // Garante que o material está aplicado
 
-                // Atualiza/Cria o AxesHelper
-                const visualAxesLength = Math.max(newSiloRadius, visualSiloTotalHeight / 2);
+                // Atualiza a placa da base (se o raio do silo mudou, a base também deve mudar)
+                siloBasePlate.geometry.dispose();
+                siloBasePlate.geometry = new THREE.CylinderGeometry(currentSiloRadius + 1, currentSiloRadius + 1, basePlateHeight, 32);
+                siloBasePlate.position.y = 0;
+                // O material da base não muda, então não precisamos atribuir novamente
+
+                // Chamar createSiloCables com os NOVOS dados e o offset correto
+                createSiloCables(parsedData, cylinderOffsetFromBase);
+
+                // A altura total visual do silo (para o AxesHelper e câmera)
+                const totalSiloVisualHeight = newSiloCylinderHeight + coneHeight + basePlateHeight;
+
+                // Atualiza o AxesHelper
                 if (axesHelper) {
-                    scene.remove(axesHelper); 
-                    axesHelper.geometry.dispose(); 
-                    axesHelper = new THREE.AxesHelper(visualAxesLength);
-                    axesHelper.position.y = 0; // Os eixos começam na base do silo (y=0)
-                } else {
-                    axesHelper = new THREE.AxesHelper(visualAxesLength);
-                    axesHelper.position.y = 0;
+                    scene.remove(axesHelper);
+                    axesHelper.geometry.dispose();
                 }
-                scene.add(axesHelper); 
-                objectsToRemove.push(axesHelper);
+                axesHelper = new THREE.AxesHelper(Math.max(currentSiloRadius * 1.5, totalSiloVisualHeight));
+                axesHelper.position.y = totalSiloVisualHeight / 2 - basePlateHeight; // Centraliza no meio da altura total do silo, ajustado pela base
+                scene.add(axesHelper);
 
-                // 4. Chamar createSiloCables com os NOVOS dados para desenhar os cabos, pontos e textos
-                createSiloCables(parsedData); 
-
+                // Ajusta o target dos controles e a posição da câmera
+                controls.target.set(0, totalSiloVisualHeight / 2, 0); // O target deve ser o centro vertical do silo
+                camera.position.set(currentSiloRadius * 2.5, controls.target.y + currentSiloRadius, currentSiloRadius * 2.5);
+                controls.update();
+                
             } catch (e) {
                 console.error("Erro ao parsear dados JSON do FlutterFlow ou durante a atualização do gráfico:", e, "Dados originais recebidos:", data);
             }
         }; // Fim de window.updateGraphData
 
-        // Chame init() para configurar a cena e desenhar o silo e cabos iniciais
         init();
 
     </script>
