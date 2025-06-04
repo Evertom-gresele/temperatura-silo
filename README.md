@@ -1,4 +1,4 @@
-<!DOCTYPE 3 html>
+<!DOCTYPE 4 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -28,7 +28,7 @@
         // Configurações do silo
         const cableSpacing = 2; // Espaçamento entre cabos na circunferência
         const pointSpacing = 1; // Espaçamento vertical entre pontos de temperatura
-        const coneHeight = 3; // Altura dos cones superior e inferior (base do silo está em y=0)
+        const coneHeight = 3; // Altura dos cones superior e inferior
 
         // Mapa de cores para interpolação de temperaturas
         const colorMap = [
@@ -60,7 +60,7 @@
         }
 
         // Função para criar os cabos e pontos de temperatura
-        function createSiloCables(parsedData) { // Agora espera parsedData
+        function createSiloCables(parsedData) {
             const distribuicaoCabos = parsedData.distribuicaoCabos;
             const alturaCabos = parsedData.alturaCabos;
             const leiturasTemperatura = parsedData.leiturasTemperatura;
@@ -76,7 +76,6 @@
                     maxCablesInAnyLine = numCablesInLine;
                 }
             }
-            // Se não houver cabos, defina um raio padrão para evitar divisão por zero
             newSiloRadius = maxCablesInAnyLine > 0 ? (maxCablesInAnyLine * cableSpacing) / (2 * Math.PI) : 5; 
 
             // Criar cabos para cada linha
@@ -85,7 +84,7 @@
                 
                 if (numCablesInLine > 0) {
                     // Calcula o ângulo inicial e o passo angular para esta linha
-                    const startAngle = i * (Math.PI / 6); // Exemplo: cada linha começa em um ângulo diferente
+                    const startAngle = i * (Math.PI / 6); 
                     const angleStep = (2 * Math.PI) / numCablesInLine;
 
                     for (let j = 0; j < numCablesInLine; j++) {
@@ -100,17 +99,17 @@
                         // Cria o cabo (linha)
                         const cableMaterial = new THREE.LineBasicMaterial({ color: 0x888888 });
                         const cableGeometry = new THREE.BufferGeometry().setFromPoints([
-                            new THREE.Vector3(cableX, 0, cableZ),
+                            new THREE.Vector3(cableX, 0, cableZ), // Começa na base do silo (y=0)
                             new THREE.Vector3(cableX, numPoints * pointSpacing, cableZ)
                         ]);
                         const cableLine = new THREE.Line(cableGeometry, cableMaterial);
                         scene.add(cableLine);
-                        objectsToRemove.push(cableLine); // Adiciona para remoção posterior
+                        objectsToRemove.push(cableLine);
 
                         // Cria os pontos de temperatura
                         for (let k = 0; k < numPoints; k++) {
                             const temp = temperatures[k] !== undefined ? temperatures[k] : 0;
-                            const pointY = k * pointSpacing;
+                            const pointY = k * pointSpacing; // Posição vertical do ponto
                             const pointColor = getColorForTemperature(temp);
 
                             const pointGeometry = new THREE.SphereGeometry(0.3, 16, 16);
@@ -118,10 +117,10 @@
                             const pointMesh = new THREE.Mesh(pointGeometry, pointMaterial);
                             pointMesh.position.set(cableX, pointY, cableZ);
                             scene.add(pointMesh);
-                            objectsToRemove.push(pointMesh); // Adiciona para remoção posterior
+                            objectsToRemove.push(pointMesh);
 
                             // Adicionar texto da temperatura
-                            if (loadedFont && temp !== 0) { // Só adiciona se a fonte estiver carregada e temp não for 0
+                            if (loadedFont && temp !== 0) {
                                 const textMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
                                 const textGeometry = new THREE.TextGeometry(temp.toString(), {
                                     font: loadedFont,
@@ -131,7 +130,7 @@
                                 textGeometry.computeBoundingBox();
                                 const textWidth = textGeometry.boundingBox.max.x - textGeometry.boundingBox.min.x;
                                 const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-                                textMesh.position.set(cableX + 0.5, pointY, cableZ); // Posição ao lado do ponto
+                                textMesh.position.set(cableX + 0.5, pointY, cableZ);
                                 objectsToRemove.push(textMesh);
                                 scene.add(textMesh);
                             }
@@ -159,8 +158,8 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Controles de Órbita
-            controls = new OrbitControls(camera, renderer.domElement);
+            // Controles de Órbita - CORREÇÃO: Usar THREE.OrbitControls
+            controls = new THREE.OrbitControls(camera, renderer.domElement); 
             controls.enableDamping = true; // para um movimento mais suave
             controls.dampingFactor = 0.25;
             controls.screenSpacePanning = false;
@@ -175,9 +174,9 @@
             directionalLight.position.set(5, 10, 7);
             scene.add(directionalLight);
 
-            // Carregar a fonte (apenas uma vez na inicialização)
+            // Carregar a fonte (apenas uma vez na inicialização) - CORREÇÃO: Usar THREE.FontLoader
             const fontLoader = new THREE.FontLoader();
-            fontLoader.load('https://unpkg.com/three@0.128.0/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+            fontLoader.load('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/fonts/helvetiker_regular.typeface.json', function (font) {
                 loadedFont = font;
                 console.log("Fonte carregada.");
             });
@@ -212,7 +211,7 @@
             objectsToRemove.push(siloTopCone);
 
             // AxesHelper
-            axesHelper = new THREE.AxesHelper(Math.max(initialRadius, initialCylinderHeight / 2 + coneHeight)); // Ajusta o tamanho
+            axesHelper = new THREE.AxesHelper(Math.max(initialRadius, initialCylinderHeight + (coneHeight * 2))); // Ajusta o tamanho para cobrir toda a altura visual
             axesHelper.position.y = 0; // Na base do silo
             scene.add(axesHelper);
             objectsToRemove.push(axesHelper);
@@ -269,7 +268,7 @@
                 }
                 newSiloRadius = maxCablesInAnyLine > 0 ? (maxCablesInAnyLine * cableSpacing) / (2 * Math.PI) : 5; 
 
-                // Determinar a altura máxima dos cabos
+                // Determinar a altura máxima dos cabos (define a altura do cilindro principal)
                 for (const caboKey in parsedData.alturaCabos) {
                     const alturaDoCabo = parsedData.alturaCabos[caboKey];
                      if (alturaDoCabo > newMaxCableHeight) {
@@ -281,14 +280,12 @@
                 const newCylinderHeight = newMaxCableHeight * pointSpacing; // Altura do cilindro principal
 
                 // Atualiza/Cria o cilindro do silo
-                // A lógica `if (siloMesh)` aqui se refere à variável global.
-                // Como ele já foi criado em `init()`, esta parte irá atualizar sua geometria e posição.
                 if (siloMesh) {
                     siloMesh.geometry.dispose();
                     siloMesh.geometry = new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, newCylinderHeight, 32);
                     siloMesh.position.y = newCylinderHeight / 2; // Centro do cilindro
                     siloMesh.material = siloMaterial; // Garante que o material é o correto
-                } else { // Caso não tenha sido inicializado (cenário menos provável agora)
+                } else { 
                     siloMesh = new THREE.Mesh(new THREE.CylinderGeometry(newSiloRadius, newSiloRadius, newCylinderHeight, 32), siloMaterial);
                     siloMesh.position.y = newCylinderHeight / 2;
                     siloMesh.name = 'siloCylinder';
