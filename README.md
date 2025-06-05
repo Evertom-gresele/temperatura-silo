@@ -1,9 +1,9 @@
-<!DOCTYPE 2 html>
+<!DOCTYPE 55 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dados do Silo - Debug Detalhado</title>
+    <title>Dados do Silo - Debug Variável</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -82,10 +82,12 @@
     </ul>
 
     <script>
-        let latestReceivedData = null; 
-        let renderAttemptInterval = null; 
-        let domAccessAttempts = 0; 
+        // Variáveis globais
+        let latestReceivedData = null; // Armazena os dados JSON crus do FlutterFlow
+        let renderAttemptInterval = null; // ID do setInterval
+        let domAccessAttempts = 0; // Contador de tentativas de acesso ao DOM
         let logCounter = 0; // Para numerar as etapas no log
+        let dataHasBeenProcessed = false; // Flag para indicar se os dados foram processados com sucesso
 
         // Funções auxiliares para logar no console e no HTML
         function addLog(message, type = 'info') {
@@ -113,6 +115,7 @@
             return text.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
 
+        // Função principal para tentar exibir os dados no DOM
         function attemptToDisplayData() {
             domAccessAttempts++;
             addLog(`Executando attemptToDisplayData. Tentativa: ${domAccessAttempts}.`, 'step');
@@ -122,6 +125,165 @@
             const statusMessage = document.querySelector('#status-message');
             const runtimeContentDiv = document.querySelector('#runtime-content');
 
-            // 2. Logar o conteúdo do body para inspeção
+            // 2. Logar o conteúdo do body para inspeção (truncado para evitar logs enormes)
             if (document.body) {
-                addLog(`Conteúdo do document.body na tentativa ${domAccessAttempts}: ${document.body.innerHTML.
+                const bodyContent = document.body.innerHTML;
+                addLog(`Conteúdo do document.body na tentativa ${domAccessAttempts}: ${bodyContent.substring(0, Math.min(bodyContent.length, 500))}... (truncado para 500 chars)`, 'info');
+            } else {
+                addLog(`document.body não acessível na tentativa ${domAccessAttempts}.`, 'warn');
+            }
+
+            // 3. Verificar se todos os elementos necessários foram encontrados no DOM
+            if (!dataDisplayDiv || !statusMessage || !runtimeContentDiv) {
+                addLog(`Elementos DOM (data-display, status-message, ou runtime-content) NÃO encontrados. Re-tentando em 1 segundo...`, 'warn');
+                
+                // Teste de appendChild simples para confirmar que o body é manipulável
+                if (document.body) {
+                    let bodyTestDiv = document.querySelector('#body-test-div');
+                    if (!bodyTestDiv) { 
+                        bodyTestDiv = document.createElement('div');
+                        bodyTestDiv.id = 'body-test-div';
+                        bodyTestDiv.style.border = '1px solid blue';
+                        bodyTestDiv.style.margin = '5px';
+                        document.body.appendChild(bodyTestDiv);
+                        addLog("Adicionado div de teste ao body ('#body-test-div').", 'info');
+                    }
+                    bodyTestDiv.textContent = `Teste de body.appendChild: Tentativa ${domAccessAttempts}. Elementos DOM ainda não encontrados.`;
+                } else {
+                    addLog("Não foi possível adicionar div de teste: document.body não está disponível.", 'error');
+                }
+
+                // Loga o estado do latestReceivedData AQUI para debug
+                addLog(`Estado de latestReceivedData: ${latestReceivedData === null ? 'null' : 'string'}. Conteúdo: ${latestReceivedData ? latestReceivedData.substring(0, Math.min(latestReceivedData.length, 100)) + '...' : 'N/A'}`, 'info');
+                
+                // Manter a mensagem "Aguardando dados..." na tela se o DOM não estiver pronto
+                if (statusMessage) { // Verifica se statusMessage foi encontrado para não dar erro
+                    statusMessage.textContent = "Aguardando dados... (DOM não pronto)";
+                }
+                return; // Sai da função, o setInterval irá chamar novamente
+            }
+
+            // Se chegamos aqui, o DOM está pronto. Parar as re-tentativas de DOM.
+            if (renderAttemptInterval) {
+                clearInterval(renderAttemptInterval);
+                renderAttemptInterval = null;
+                addLog(`Sucesso! Elementos DOM encontrados após ${domAccessAttempts} tentativas. Parando re-tentativas de DOM.`, 'success');
+                runtimeContentDiv.innerHTML = `<p style="color: green; font-weight: bold;">Sucesso! Elementos DOM encontrados após ${domAccessAttempts} tentativas.</p>`;
+            } else {
+                addLog(`Elementos DOM já estavam encontrados.`, 'info');
+            }
+            
+            // Agora, vamos verificar se os dados foram recebidos e processados
+            if (dataHasBeenProcessed) {
+                addLog("Dados já foram processados e exibidos. Nenhuma ação adicional.", 'info');
+                return; // Não precisa re-renderizar se já foi feito
+            }
+
+            // Lógica para verificar e exibir os dados
+            if (latestReceivedData) {
+                addLog("Dados enviados pelo FlutterFlow ENCONTRADOS na variável `latestReceivedData`!", 'success');
+                statusMessage.textContent = "Dados recebidos e exibidos:";
+                dataDisplayDiv.innerHTML = ''; // Limpa o conteúdo anterior
+
+                const rawDataSection = document.createElement('div');
+                rawDataSection.className = 'data-section';
+                rawDataSection.innerHTML = '<h2>Dados Brutos (String JSON)</h2><pre>' + escapeHtml(latestReceivedData) + '</pre>';
+                dataDisplayDiv.appendChild(rawDataSection);
+                addLog("Dados brutos (JSON String) adicionados ao DOM.", 'info');
+
+                try {
+                    const parsed = JSON.parse(latestReceivedData);
+                    addLog("JSON parseado com sucesso.", 'success');
+
+                    const distCabosSection = document.createElement('div');
+                    distCabosSection.className = 'data-section';
+                    distCabosSection.innerHTML = '<h2>distribuicaoCabos</h2><pre>' + escapeHtml(JSON.stringify(parsed.distribuicaoCabos, null, 2)) + '</pre>';
+                    dataDisplayDiv.appendChild(distCabosSection);
+                    addLog("Dados de 'distribuicaoCabos' adicionados.", 'info');
+
+                    const alturaCabosSection = document.createElement('div');
+                    alturaCabosSection.className = 'data-section';
+                    alturaCabosSection.innerHTML = '<h2>alturaCabos</h2><pre>' + escapeHtml(JSON.stringify(parsed.alturaCabos, null, 2)) + '</pre>';
+                    dataDisplayDiv.appendChild(alturaCabosSection);
+                    addLog("Dados de 'alturaCabos' adicionados.", 'info');
+
+                    const leiturasTempSection = document.createElement('div');
+                    leiturasTempSection.className = 'data-section';
+                    leiturasTempSection.innerHTML = '<h2>leiturasTemperatura</h2><pre>' + escapeHtml(JSON.stringify(parsed.leiturasTemperatura, null, 2)) + '</pre>';
+                    dataDisplayDiv.appendChild(leiturasTempSection);
+                    addLog("Dados de 'leiturasTemperatura' adicionados. Exibição completa.", 'success');
+                    
+                    dataHasBeenProcessed = true; // Marca que os dados foram exibidos
+                    addLog("Processamento e exibição de dados concluídos.", 'success');
+
+                } catch (e) {
+                    addLog(`Erro ao parsear JSON ou durante a exibição detalhada: ${e.message}. Dados recebidos: ${latestReceivedData}`, 'error');
+                    const errorSection = document.createElement('div');
+                    errorSection.className = 'data-section';
+                    errorSection.innerHTML = '<h2 class="error-message">Erro ao Parsear JSON para Exibição Detalhada</h2><p>String recebida não é um JSON válido.</p><pre class="error-message">' + escapeHtml(latestReceivedData) + '</pre><p class="error-message">Erro: ' + escapeHtml(e.message) + '</p>';
+                    dataDisplayDiv.appendChild(errorSection);
+                }
+            } else {
+                addLog("Dados enviados pelo FlutterFlow NÃO encontrados em `latestReceivedData`. Aguardando...", 'warn');
+                statusMessage.textContent = "Aguardando dados...";
+            }
+        }
+
+        // Esta é a função que o FlutterFlow irá chamar
+        window.updateGraphData = function(data) {
+            addLog("Função updateGraphData chamada pelo FlutterFlow.", 'step');
+            addLog(`Conteúdo bruto recebido em updateGraphData: ${data.substring(0, Math.min(data.length, 100))}...`, 'info');
+            
+            let cleanedDataString = data;
+            // Verifica e remove aspas extras se o FlutterFlow estiver enviando JSON stringificado duas vezes
+            if (typeof data === 'string' && data.startsWith('"') && data.endsWith('"')) {
+                cleanedDataString = data.substring(1, data.length - 1);
+                addLog("String JSON limpa (removidas aspas extras).", 'info');
+            } else {
+                addLog("Dados recebidos não precisam de limpeza de aspas extras ou não são string.", 'info');
+            }
+            
+            latestReceivedData = cleanedDataString; 
+            addLog(`latestReceivedData ATUALIZADO em updateGraphData. Valor: ${latestReceivedData.substring(0, Math.min(latestReceivedData.length, 100))}...`, 'info');
+
+            // Imediatamente tenta exibir os dados após recebê-los
+            attemptToDisplayData();
+
+            try {
+                const parsed = JSON.parse(cleanedDataString);
+                addLog("Dados JSON parseados para console interno (verificação).", 'info');
+            } catch (e) {
+                addLog(`Erro ao parsear JSON (verificação interna): ${e.message}. String recebida: ${cleanedDataString}`, 'error');
+            }
+        };
+
+        // Adiciona um listener para quando a página é completamente carregada
+        document.addEventListener('DOMContentLoaded', (event) => {
+            addLog("Evento DOMContentLoaded disparado. Documento HTML carregado. DOM pronto.", 'success');
+            
+            // Inicia o intervalo de re-tentativa para DOM e dados a cada 1 segundo
+            if (!renderAttemptInterval) {
+                renderAttemptInterval = setInterval(attemptToDisplayData, 1000); // Tenta a cada 1 segundo
+                addLog("Intervalo de re-tentativa (1s) iniciado para DOM e dados.", 'info');
+            } else {
+                addLog("Intervalo de re-tentativa já estava ativo.", 'info');
+            }
+            
+            // Faz uma tentativa imediata após o DOM estar pronto
+            attemptToDisplayData(); 
+        });
+
+        // Limpa o intervalo se o iframe for descarregado
+        window.addEventListener('beforeunload', () => {
+            addLog("Evento beforeunload disparado. Limpando intervalo de re-tentativa.", 'info');
+            if (renderAttemptInterval) {
+                clearInterval(renderAttemptInterval);
+                renderAttemptInterval = null;
+            }
+        });
+
+        addLog("Script index3.html carregado.", 'success');
+
+    </script>
+</body>
+</html>
