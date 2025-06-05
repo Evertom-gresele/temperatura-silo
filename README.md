@@ -1,4 +1,4 @@
-<!DOCTYPE 2 html>
+<!DOCTYPE 5 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -83,7 +83,7 @@
 
     <script>
         // Variáveis globais
-        let latestReceivedData = null; // Armazena os dados JSON crus do FlutterFlow
+        let latestReceivedData = null; // Armazena os dados crus do FlutterFlow como string
         let renderAttemptInterval = null; // ID do setInterval
         let domAccessAttempts = 0; // Contador de tentativas de acesso ao DOM
         let logCounter = 0; // Para numerar as etapas no log
@@ -112,7 +112,9 @@
 
         function escapeHtml(text) {
             const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+            // Garante que o texto seja uma string antes de tentar o replace
+            const stringText = String(text); 
+            return stringText.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
 
         // Função principal para tentar exibir os dados no DOM
@@ -154,7 +156,8 @@
                 }
 
                 // Loga o estado do latestReceivedData AQUI para debug
-                addLog(`Estado de latestReceivedData: ${latestReceivedData === null ? 'null' : 'string'}. Conteúdo: ${latestReceivedData ? latestReceivedData.substring(0, Math.min(latestReceivedData.length, 100)) + '...' : 'N/A'}`, 'info');
+                const displayDataInfo = latestReceivedData === null ? 'null' : (typeof latestReceivedData === 'string' ? `string (length: ${latestReceivedData.length})` : typeof latestReceivedData);
+                addLog(`Estado de latestReceivedData: ${displayDataInfo}. Conteúdo: ${latestReceivedData ? String(latestReceivedData).substring(0, Math.min(String(latestReceivedData).length, 100)) + '...' : 'N/A'}`, 'info');
                 
                 // Manter a mensagem "Aguardando dados..." na tela se o DOM não estiver pronto
                 if (statusMessage) { // Verifica se statusMessage foi encontrado para não dar erro
@@ -173,56 +176,33 @@
                 addLog(`Elementos DOM já estavam encontrados.`, 'info');
             }
             
-            // Agora, vamos verificar se os dados foram recebidos e processados
+            // Agora, vamos verificar se os dados foram recebidos e exibidos
             if (dataHasBeenProcessed) {
                 addLog("Dados já foram processados e exibidos. Nenhuma ação adicional.", 'info');
                 return; // Não precisa re-renderizar se já foi feito
             }
 
             // Lógica para verificar e exibir os dados
-            if (latestReceivedData) {
+            if (latestReceivedData !== null) { // Agora verifica se não é null
                 addLog("Dados enviados pelo FlutterFlow ENCONTRADOS na variável `latestReceivedData`!", 'success');
-                statusMessage.textContent = "Dados recebidos e exibidos:";
+                statusMessage.textContent = "Dados recebidos e exibidos (raw):";
                 dataDisplayDiv.innerHTML = ''; // Limpa o conteúdo anterior
 
                 const rawDataSection = document.createElement('div');
                 rawDataSection.className = 'data-section';
-                rawDataSection.innerHTML = '<h2>Dados Brutos (String JSON)</h2><pre>' + escapeHtml(latestReceivedData) + '</pre>';
+                // Garante que o conteúdo seja tratado como string para exibição
+                rawDataSection.innerHTML = '<h2>Conteúdo Bruto Recebido</h2><pre>' + escapeHtml(String(latestReceivedData)) + '</pre>';
                 dataDisplayDiv.appendChild(rawDataSection);
-                addLog("Dados brutos (JSON String) adicionados ao DOM.", 'info');
+                addLog("Conteúdo bruto adicionado ao DOM. Tipo: " + typeof latestReceivedData, 'success');
 
-                try {
-                    const parsed = JSON.parse(latestReceivedData);
-                    addLog("JSON parseado com sucesso.", 'success');
+                // *** REMOVIDA A TENTATIVA DE PARSE JSON AQUI ***
+                // O objetivo é APENAS exibir o que foi recebido.
+                // A lógica de parsing e exibição de JSON detalhado
+                // pode ser adicionada posteriormente, uma vez que
+                // entendamos o formato bruto.
 
-                    const distCabosSection = document.createElement('div');
-                    distCabosSection.className = 'data-section';
-                    distCabosSection.innerHTML = '<h2>distribuicaoCabos</h2><pre>' + escapeHtml(JSON.stringify(parsed.distribuicaoCabos, null, 2)) + '</pre>';
-                    dataDisplayDiv.appendChild(distCabosSection);
-                    addLog("Dados de 'distribuicaoCabos' adicionados.", 'info');
-
-                    const alturaCabosSection = document.createElement('div');
-                    alturaCabosSection.className = 'data-section';
-                    alturaCabosSection.innerHTML = '<h2>alturaCabos</h2><pre>' + escapeHtml(JSON.stringify(parsed.alturaCabos, null, 2)) + '</pre>';
-                    dataDisplayDiv.appendChild(alturaCabosSection);
-                    addLog("Dados de 'alturaCabos' adicionados.", 'info');
-
-                    const leiturasTempSection = document.createElement('div');
-                    leiturasTempSection.className = 'data-section';
-                    leiturasTempSection.innerHTML = '<h2>leiturasTemperatura</h2><pre>' + escapeHtml(JSON.stringify(parsed.leiturasTemperatura, null, 2)) + '</pre>';
-                    dataDisplayDiv.appendChild(leiturasTempSection);
-                    addLog("Dados de 'leiturasTemperatura' adicionados. Exibição completa.", 'success');
-                    
-                    dataHasBeenProcessed = true; // Marca que os dados foram exibidos
-                    addLog("Processamento e exibição de dados concluídos.", 'success');
-
-                } catch (e) {
-                    addLog(`Erro ao parsear JSON ou durante a exibição detalhada: ${e.message}. Dados recebidos: ${latestReceivedData}`, 'error');
-                    const errorSection = document.createElement('div');
-                    errorSection.className = 'data-section';
-                    errorSection.innerHTML = '<h2 class="error-message">Erro ao Parsear JSON para Exibição Detalhada</h2><p>String recebida não é um JSON válido.</p><pre class="error-message">' + escapeHtml(latestReceivedData) + '</pre><p class="error-message">Erro: ' + escapeHtml(e.message) + '</p>';
-                    dataDisplayDiv.appendChild(errorSection);
-                }
+                dataHasBeenProcessed = true; // Marca que os dados foram exibidos
+                addLog("Exibição de dados brutos concluída.", 'success');
             } else {
                 addLog("Dados enviados pelo FlutterFlow NÃO encontrados em `latestReceivedData`. Aguardando...", 'warn');
                 statusMessage.textContent = "Aguardando dados...";
@@ -232,50 +212,17 @@
         // Esta é a função que o FlutterFlow irá chamar
         window.updateGraphData = function(data) {
             addLog("Função updateGraphData chamada pelo FlutterFlow.", 'step');
-            addLog(`Conteúdo bruto recebido em updateGraphData: ${data.substring(0, Math.min(data.length, 100))}...`, 'info');
+            addLog(`Tipo de 'data' recebido: ${typeof data}. Conteúdo bruto recebido em updateGraphData: ${String(data).substring(0, Math.min(String(data).length, 500))}... (truncado para 500 chars)`, 'info');
             
-            let cleanedDataString = data;
-
-            // Remove aspas externas se a string começar e terminar com elas.
-            // Esta etapa é crucial para lidar com a "dupla stringificação" do FlutterFlow.
-            if (typeof cleanedDataString === 'string' && cleanedDataString.length > 1 && cleanedDataString.startsWith('"') && cleanedDataString.endsWith('"')) {
-                cleanedDataString = cleanedDataString.substring(1, cleanedDataString.length - 1);
-                addLog("Primeiro nível de aspas externas removido.", 'info');
-            }
-
-            // Desescapa as aspas internas (transforma \" em ").
-            // Isso precisa acontecer APÓS a remoção das aspas externas.
-            // Use uma regex global para pegar todas as ocorrências.
-            cleanedDataString = cleanedDataString.replace(/\\"/g, '"');
-            addLog("Aspas internas desescapadas.", 'info');
-
-            // O FlutterFlow pode estar enviando strings que são "escapadas"
-            // para serem passadas como argumentos de JavaScript.
-            // Isso significa que outros caracteres como \\ (barra invertida) podem
-            // precisar ser desescapados também, se não fizerem parte do JSON válido.
-            // No entanto, para JSON, o foco principal são as aspas duplas.
-            // Se ainda houver problemas, podemos tentar um 'JSON.parse' aninhado aqui
-            // ou uma lógica de desescapamento mais genérica para barras invertidas.
-            
-            // >>>>> ADICIONE ESTE NOVO LOG AQUI <<<<<
-            // Este log é crucial para vermos a string EXATA que será parseada
-            addLog(`String FINAL APÓS LIMPEZA e DESESCAPAMENTO (para JSON.parse): ${cleanedDataString.substring(0, Math.min(cleanedDataString.length, 500))}... (truncado para 500 chars)`, 'warn');
-            // >>>>> FIM DO NOVO LOG <<<<<
-
-            latestReceivedData = cleanedDataString; 
+            // Simplesmente armazena o dado recebido, convertendo-o para string se não for
+            latestReceivedData = String(data); 
             addLog(`latestReceivedData ATUALIZADO em updateGraphData. Valor: ${latestReceivedData.substring(0, Math.min(latestReceivedData.length, 100))}...`, 'info');
 
             // Imediatamente tenta exibir os dados após recebê-los
             attemptToDisplayData();
-
-            try {
-                // Tenta parsear o JSON limpo
-                const parsed = JSON.parse(latestReceivedData);
-                addLog("Dados JSON parseados para console interno (verificação).", 'success');
-            } catch (e) {
-                // Se falhar, o erro virá com a string limpa
-                addLog(`Erro ao parsear JSON (verificação interna): ${e.message}. String recebida que causou erro: ${latestReceivedData.substring(0, Math.min(latestReceivedData.length, 500))}... (truncado para 500 chars)`, 'error');
-            }
+            
+            // Não fazemos mais nenhum JSON.parse ou limpeza aqui.
+            // O objetivo é capturar o dado EXATAMENTE como ele chega.
         };
 
         // Adiciona um listener para quando a página é completamente carregada
