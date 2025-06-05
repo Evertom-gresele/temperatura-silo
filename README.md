@@ -1,4 +1,4 @@
-<!DOCTYPE 100 html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -48,48 +48,48 @@
         const originalConsoleLog = console.log;
         console.log = function(...args) {
             originalConsoleLog.apply(console, args);
+            
+            // Converte todos os argumentos para uma única string para processamento robusto
             const logString = args.map(arg => {
                 if (typeof arg === 'object') {
-                    // Se o argumento for um objeto, converte para string JSON
                     return JSON.stringify(arg);
                 }
                 return String(arg);
             }).join(" ");
-            consoleLogs.push(logString);
             
-            // Verifica imediatamente se o novo log contém o JSON
-            checkForJson(logString);
+            consoleLogs.push(logString);
+            processConsoleLogs(); // Processa logs imediatamente
         };
 
-        function checkForJson(log) {
-            if (jsonFound) return;
+        function processConsoleLogs() {
+            if (jsonFound) return; // Se o JSON já foi encontrado, não faz nada
             
-            if (log.includes(targetString)) {
-                try {
-                    let jsonData;
-                    
-                    // Usa uma regex mais robusta para encontrar o objeto JSON após o marcador
-                    // Isso lida com casos onde o JSON é logado como um objeto separado ou como parte de uma string
-                    const match = log.match(new RegExp(targetString + '\\s*(\\{[\\s\\S]*\\})'));
-                    
-                    if (match && match[1]) {
-                        jsonData = JSON.parse(match[1]);
-                    }
-                    
-                    if (jsonData) {
-                        // Garante que os elementos existem antes de tentar acessá-los
-                        if (jsonOutputElement && statusElement) {
-                            jsonOutputElement.textContent = JSON.stringify(jsonData, null, 2);
-                            statusElement.textContent = "JSON encontrado e processado com sucesso!";
-                            statusElement.classList.add("success");
-                            jsonFound = true;
-                            originalConsoleLog("JSON encontrado e exibido com sucesso!");
+            for (const log of consoleLogs) {
+                if (log.includes(targetString)) {
+                    try {
+                        // Regex para capturar o JSON que está em formato de string
+                        // Procura por '{' e '}' que delimitam o objeto JSON
+                        const match = log.match(new RegExp(targetString + '\\s*(\\{[\\s\\S]*\\})'));
+                        
+                        if (match && match[1]) {
+                            const jsonData = JSON.parse(match[1]);
+                            // Garante que os elementos do DOM existam antes de tentar acessá-los
+                            if (jsonOutputElement && statusElement) {
+                                jsonOutputElement.textContent = JSON.stringify(jsonData, null, 2);
+                                statusElement.textContent = "JSON encontrado e processado com sucesso!";
+                                statusElement.classList.add("success");
+                                jsonFound = true;
+                                originalConsoleLog("JSON encontrado e exibido com sucesso!");
+                                // Limpa os logs para evitar reprocessamento desnecessário
+                                consoleLogs.length = 0;
+                                return; // Sai da função assim que encontrar
+                            }
                         }
-                    }
-                } catch (e) {
-                    originalConsoleLog("Erro ao parsear JSON:", e);
-                    if (statusElement) {
-                        statusElement.textContent = "Erro ao processar JSON: " + e.message;
+                    } catch (e) {
+                        originalConsoleLog("Erro ao parsear JSON de log:", e);
+                        if (statusElement) {
+                            statusElement.textContent = "Erro ao processar JSON: " + e.message;
+                        }
                     }
                 }
             }
@@ -111,11 +111,8 @@
                 statusElement.textContent = `Buscando JSON... (tentativa ${retryCount}/${maxRetries})`;
             }
             
-            // Verifica todos os logs armazenados
-            for (const log of consoleLogs) {
-                checkForJson(log);
-                if (jsonFound) break;
-            }
+            // Tenta encontrar o JSON nos logs já armazenados (para logs que ocorreram antes da inicialização completa)
+            processConsoleLogs();
 
             if (!jsonFound) {
                 originalConsoleLog(`JSON não encontrado ainda. Tentativa ${retryCount}/${maxRetries}. Tentando novamente em 3 segundos...`);
@@ -129,8 +126,7 @@
             }
         }
 
-        // Inicia a busca imediatamente após o script ser carregado
-        // Adiciona um listener para garantir que os elementos do DOM estejam disponíveis
+        // Inicia a busca após o DOM ser completamente carregado
         document.addEventListener('DOMContentLoaded', () => {
             searchAndDisplayJson();
         });
