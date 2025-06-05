@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE 1 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -34,15 +34,30 @@
 </head>
 <body>
     <h1>Dados Recebidos do FlutterFlow</h1>
-    <p>Aguardando dados... (Verifique o console para logs detalhados)</p>
+    <p id="status-message">Aguardando dados... (Verifique o console para logs detalhados)</p>
 
     <div id="data-display">
         </div>
 
     <script>
+        let isDomReady = false;
+        let pendingData = null; // Para armazenar dados se eles chegarem antes do DOM estar pronto
+
         // Função para exibir dados na tela
         function displayData(data) {
             const dataDisplayDiv = document.getElementById('data-display');
+            const statusMessage = document.getElementById('status-message');
+
+            if (!dataDisplayDiv || !statusMessage) {
+                console.warn("displayData: Elementos DOM não encontrados. Dados serão exibidos assim que o DOM estiver pronto.");
+                pendingData = data; // Armazena os dados para exibir depois
+                return; // Sai da função, espera o DOM ficar pronto
+            }
+
+            // Se chegamos aqui, o DOM está pronto e os elementos existem
+            if (statusMessage) {
+                statusMessage.textContent = "Dados recebidos e exibidos:";
+            }
             dataDisplayDiv.innerHTML = ''; // Limpa o conteúdo anterior
 
             if (!data) {
@@ -53,12 +68,12 @@
             // Exibir a string JSON bruta
             const rawDataSection = document.createElement('div');
             rawDataSection.className = 'data-section';
-            rawDataSection.innerHTML = '<h2>Dados Brutos (String JSON)</h2><pre>' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+            rawDataSection.innerHTML = '<h2>Dados Brutos (String JSON)</h2><pre>' + escapeHtml(data) + '</pre>'; // Use 'data' diretamente aqui, pois já foi limpado
             dataDisplayDiv.appendChild(rawDataSection);
 
             // Tentar exibir dados parseados de forma mais amigável
             try {
-                const parsed = JSON.parse(data);
+                const parsed = JSON.parse(data); // Tenta parsear a string limpa
 
                 // Exibir distribuicaoCabos
                 const distCabosSection = document.createElement('div');
@@ -102,31 +117,42 @@
         window.updateGraphData = function(data) {
             console.log("updateGraphData: Função chamada com dados brutos do FlutterFlow:", data);
             
-            // O FlutterFlow geralmente envia a string JSON já encadeada com aspas
-            // Remova as aspas extras se existirem (ex: '"{\"key\":\"value\"}"' se torna '{"key":"value"}')
             let cleanedDataString = data;
+            // Se o FlutterFlow envia a string JSON já encadeada com aspas (ex: '"{\"key\":\"value\"}"'), remove as aspas extras
             if (typeof data === 'string' && data.startsWith('"') && data.endsWith('"')) {
                 cleanedDataString = data.substring(1, data.length - 1);
+                console.log("updateGraphData: String JSON limpa (removidas aspas extras):", cleanedDataString);
             }
             
-            // Exibir os dados na tela
-            displayData(cleanedDataString);
+            // Se o DOM já está pronto, exibe os dados diretamente
+            if (isDomReady) {
+                displayData(cleanedDataString);
+            } else {
+                // Caso contrário, armazena os dados para processar quando o DOM estiver pronto
+                pendingData = cleanedDataString;
+                console.log("updateGraphData: DOM ainda não pronto, dados armazenados para exibição posterior.");
+            }
             
             // Opcional: Tentar parsear para confirmar se é JSON válido para depuração no console
             try {
                 const parsed = JSON.parse(cleanedDataString);
                 console.log("updateGraphData: Dados JSON parseados:", parsed);
             } catch (e) {
-                console.error("updateGraphData: Erro ao parsear JSON:", e, "String recebida:", cleanedDataString);
+                console.error("updateGraphData: Erro ao parsear JSON no console (não impede exibição se a string for válida):", e, "String recebida:", cleanedDataString);
             }
         };
 
-        // Adiciona um listener para quando a página é completamente carregada,
-        // para garantir que 'data-display' esteja disponível.
+        // Adiciona um listener para quando a página é completamente carregada
         document.addEventListener('DOMContentLoaded', (event) => {
-            console.log("Documento HTML carregado.");
-            // Você pode adicionar uma chamada de teste aqui se quiser ver um valor padrão
-            // window.updateGraphData(JSON.stringify({ test: "Dados padrão do HTML" }));
+            console.log("Documento HTML carregado. DOM pronto.");
+            isDomReady = true; // Define a flag para indicar que o DOM está pronto
+
+            // Se houver dados pendentes que chegaram antes do DOM estar pronto, exiba-os agora
+            if (pendingData) {
+                console.log("DOMContentLoaded: Exibindo dados pendentes.");
+                displayData(pendingData);
+                pendingData = null; // Limpa os dados pendentes
+            }
         });
 
     </script>
