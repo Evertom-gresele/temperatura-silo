@@ -1,4 +1,4 @@
-<!DOCTYPE 55 html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -235,14 +235,30 @@
             addLog(`Conteúdo bruto recebido em updateGraphData: ${data.substring(0, Math.min(data.length, 100))}...`, 'info');
             
             let cleanedDataString = data;
-            // Verifica e remove aspas extras se o FlutterFlow estiver enviando JSON stringificado duas vezes
-            if (typeof data === 'string' && data.startsWith('"') && data.endsWith('"')) {
-                cleanedDataString = data.substring(1, data.length - 1);
-                addLog("String JSON limpa (removidas aspas extras).", 'info');
+
+            // Primeira tentativa de remoção de aspas externas e desescapamento
+            // Verifica se a string começa e termina com aspas e se aspas internas estão escapadas
+            if (typeof cleanedDataString === 'string' && cleanedDataString.startsWith('"') && cleanedDataString.endsWith('"') && cleanedDataString.includes('\\"')) {
+                // Remove as aspas externas
+                cleanedDataString = cleanedDataString.substring(1, cleanedDataString.length - 1);
+                addLog("Primeiro nível de aspas externas removido.", 'info');
+                
+                // Desescapa as aspas internas (transforma \" em ")
+                cleanedDataString = cleanedDataString.replace(/\\"/g, '"');
+                addLog("Aspas internas desescapadas.", 'info');
+            } else if (typeof cleanedDataString === 'string' && cleanedDataString.startsWith('"') && cleanedDataString.endsWith('"')) {
+                // Caso seja apenas uma string normal que foi stringificada (sem aspas internas escapadas)
+                cleanedDataString = cleanedDataString.substring(1, cleanedDataString.length - 1);
+                addLog("Apenas aspas externas removidas (não havia escapamento interno).", 'info');
             } else {
-                addLog("Dados recebidos não precisam de limpeza de aspas extras ou não são string.", 'info');
+                addLog("Dados recebidos não precisam de limpeza de aspas extras ou não são string inicial.", 'info');
             }
             
+            // >>>>> ADICIONE ESTE NOVO LOG AQUI <<<<<
+            // Este log é crucial para vermos a string EXATA que será parseada
+            addLog(`String FINAL APÓS LIMPEZA e DESESCAPAMENTO (para JSON.parse): ${cleanedDataString.substring(0, Math.min(cleanedDataString.length, 500))}... (truncado para 500 chars)`, 'warn');
+            // >>>>> FIM DO NOVO LOG <<<<<
+
             latestReceivedData = cleanedDataString; 
             addLog(`latestReceivedData ATUALIZADO em updateGraphData. Valor: ${latestReceivedData.substring(0, Math.min(latestReceivedData.length, 100))}...`, 'info');
 
@@ -250,10 +266,12 @@
             attemptToDisplayData();
 
             try {
-                const parsed = JSON.parse(cleanedDataString);
-                addLog("Dados JSON parseados para console interno (verificação).", 'info');
+                // Tenta parsear o JSON limpo
+                const parsed = JSON.parse(latestReceivedData);
+                addLog("Dados JSON parseados para console interno (verificação).", 'success');
             } catch (e) {
-                addLog(`Erro ao parsear JSON (verificação interna): ${e.message}. String recebida: ${cleanedDataString}`, 'error');
+                // Se falhar, o erro virá com a string limpa
+                addLog(`Erro ao parsear JSON (verificação interna): ${e.message}. String recebida que causou erro: ${latestReceivedData.substring(0, Math.min(latestReceivedData.length, 500))}... (truncado para 500 chars)`, 'error');
             }
         };
 
