@@ -1,4 +1,4 @@
-<!DOCTYPE 33 html>
+<!DOCTYPE 100 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -33,16 +33,10 @@
             color: green;
         }
     </style>
-</head>
-<body>
-    <h1>JSON Recebido do WebView</h1>
-    <div id="status" class="status">Aguardando JSON...</div>
-    <pre id="jsonOutput">Aguardando dados...</pre>
-
     <script>
         const targetString = "JSON final enviado para o WebView:";
-        const jsonOutputElement = document.getElementById("jsonOutput");
-        const statusElement = document.getElementById("status");
+        let jsonOutputElement; // Será inicializado após o DOM carregar
+        let statusElement;     // Será inicializado após o DOM carregar
         let jsonFound = false;
         let retryCount = 0;
         const maxRetries = 20; // Limite máximo de tentativas
@@ -83,24 +77,39 @@
                     }
                     
                     if (jsonData) {
-                        jsonOutputElement.textContent = JSON.stringify(jsonData, null, 2);
-                        statusElement.textContent = "JSON encontrado e processado com sucesso!";
-                        statusElement.classList.add("success");
-                        jsonFound = true;
-                        originalConsoleLog("JSON encontrado e exibido com sucesso!");
+                        // Garante que os elementos existem antes de tentar acessá-los
+                        if (jsonOutputElement && statusElement) {
+                            jsonOutputElement.textContent = JSON.stringify(jsonData, null, 2);
+                            statusElement.textContent = "JSON encontrado e processado com sucesso!";
+                            statusElement.classList.add("success");
+                            jsonFound = true;
+                            originalConsoleLog("JSON encontrado e exibido com sucesso!");
+                        }
                     }
                 } catch (e) {
                     originalConsoleLog("Erro ao parsear JSON:", e);
-                    statusElement.textContent = "Erro ao processar JSON: " + e.message;
+                    if (statusElement) {
+                        statusElement.textContent = "Erro ao processar JSON: " + e.message;
+                    }
                 }
             }
         }
 
         function searchAndDisplayJson() {
+            // Inicializa os elementos do DOM aqui, pois o script está no head
+            if (!jsonOutputElement) {
+                jsonOutputElement = document.getElementById("jsonOutput");
+            }
+            if (!statusElement) {
+                statusElement = document.getElementById("status");
+            }
+
             if (jsonFound || retryCount >= maxRetries) return;
             
             retryCount++;
-            statusElement.textContent = `Buscando JSON... (tentativa ${retryCount}/${maxRetries})`;
+            if (statusElement) {
+                statusElement.textContent = `Buscando JSON... (tentativa ${retryCount}/${maxRetries})`;
+            }
             
             // Verifica todos os logs armazenados
             for (const log of consoleLogs) {
@@ -113,17 +122,24 @@
                 if (retryCount < maxRetries) {
                     setTimeout(searchAndDisplayJson, 3000);
                 } else {
-                    statusElement.textContent = "Limite de tentativas atingido. JSON não encontrado.";
+                    if (statusElement) {
+                        statusElement.textContent = "Limite de tentativas atingido. JSON não encontrado.";
+                    }
                 }
             }
         }
 
-        // Inicia a busca após um pequeno atraso para garantir que logs iniciais sejam capturados
-        // Certifique-se de que os elementos 'jsonOutput' e 'status' existam no DOM antes de executar este script.
-        window.onload = () => {
-            setTimeout(searchAndDisplayJson, 1000); // Espera 1 segundo antes da primeira busca
-        };
+        // Inicia a busca imediatamente após o script ser carregado
+        // Adiciona um listener para garantir que os elementos do DOM estejam disponíveis
+        document.addEventListener('DOMContentLoaded', () => {
+            searchAndDisplayJson();
+        });
+
     </script>
+</head>
+<body>
+    <h1>JSON Recebido do WebView</h1>
+    <div id="status" class="status">Aguardando JSON...</div>
+    <pre id="jsonOutput">Aguardando dados...</pre>
 </body>
 </html>
-
