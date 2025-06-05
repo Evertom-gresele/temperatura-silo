@@ -1,4 +1,4 @@
-<!DOCTYPE 1 html>
+<!DOCTYPE 2 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -40,40 +40,57 @@
         </div>
 
     <script>
-        let isDomReady = false;
-        let pendingData = null; // Para armazenar dados se eles chegarem antes do DOM estar pronto
+        let latestReceivedData = null; // Armazena sempre o último dado recebido
 
-        // Função para exibir dados na tela
-        function displayData(data) {
+        // Função auxiliar para escapar HTML (segurança básica)
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        // Função principal para exibir dados na tela.
+        // Tenta várias vezes se o DOM não estiver pronto.
+        function displayDataInDom() {
             const dataDisplayDiv = document.getElementById('data-display');
             const statusMessage = document.getElementById('status-message');
 
             if (!dataDisplayDiv || !statusMessage) {
-                console.warn("displayData: Elementos DOM não encontrados. Dados serão exibidos assim que o DOM estiver pronto.");
-                pendingData = data; // Armazena os dados para exibir depois
-                return; // Sai da função, espera o DOM ficar pronto
+                console.warn("displayDataInDom: Elementos DOM (data-display ou status-message) não encontrados. Tentando novamente em 100ms.");
+                // Tenta novamente em 100ms se os elementos não estiverem prontos
+                setTimeout(displayDataInDom, 100); 
+                return;
             }
 
             // Se chegamos aqui, o DOM está pronto e os elementos existem
+            console.log("displayDataInDom: Elementos DOM encontrados, exibindo dados.");
+
             if (statusMessage) {
                 statusMessage.textContent = "Dados recebidos e exibidos:";
             }
             dataDisplayDiv.innerHTML = ''; // Limpa o conteúdo anterior
 
-            if (!data) {
-                dataDisplayDiv.innerHTML = '<p>Nenhum dado recebido ou dado inválido.</p>';
+            if (!latestReceivedData) {
+                dataDisplayDiv.innerHTML = '<p>Nenhum dado para exibir.</p>';
                 return;
             }
+
+            const dataToDisplay = latestReceivedData;
 
             // Exibir a string JSON bruta
             const rawDataSection = document.createElement('div');
             rawDataSection.className = 'data-section';
-            rawDataSection.innerHTML = '<h2>Dados Brutos (String JSON)</h2><pre>' + escapeHtml(data) + '</pre>'; // Use 'data' diretamente aqui, pois já foi limpado
+            rawDataSection.innerHTML = '<h2>Dados Brutos (String JSON)</h2><pre>' + escapeHtml(dataToDisplay) + '</pre>';
             dataDisplayDiv.appendChild(rawDataSection);
 
             // Tentar exibir dados parseados de forma mais amigável
             try {
-                const parsed = JSON.parse(data); // Tenta parsear a string limpa
+                const parsed = JSON.parse(dataToDisplay);
 
                 // Exibir distribuicaoCabos
                 const distCabosSection = document.createElement('div');
@@ -96,21 +113,9 @@
             } catch (e) {
                 const errorSection = document.createElement('div');
                 errorSection.className = 'data-section';
-                errorSection.innerHTML = '<h2>Erro ao Parsear JSON</h2><p>String recebida não é um JSON válido.</p><pre>' + escapeHtml(data) + '</pre><p>Erro: ' + escapeHtml(e.message) + '</p>';
+                errorSection.innerHTML = '<h2>Erro ao Parsear JSON para Exibição Detalhada</h2><p>String recebida não é um JSON válido.</p><pre>' + escapeHtml(dataToDisplay) + '</pre><p>Erro: ' + escapeHtml(e.message) + '</p>';
                 dataDisplayDiv.appendChild(errorSection);
             }
-        }
-
-        // Função auxiliar para escapar HTML (segurança básica)
-        function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
 
         // Esta é a função que o FlutterFlow irá chamar
@@ -124,35 +129,28 @@
                 console.log("updateGraphData: String JSON limpa (removidas aspas extras):", cleanedDataString);
             }
             
-            // Se o DOM já está pronto, exibe os dados diretamente
-            if (isDomReady) {
-                displayData(cleanedDataString);
-            } else {
-                // Caso contrário, armazena os dados para processar quando o DOM estiver pronto
-                pendingData = cleanedDataString;
-                console.log("updateGraphData: DOM ainda não pronto, dados armazenados para exibição posterior.");
-            }
+            latestReceivedData = cleanedDataString; // Armazena sempre o dado mais recente
+            console.log("updateGraphData: Dados armazenados em latestReceivedData.");
+
+            // Tenta exibir os dados. A função displayDataInDom irá lidar com o DOM não pronto.
+            displayDataInDom();
             
             // Opcional: Tentar parsear para confirmar se é JSON válido para depuração no console
             try {
                 const parsed = JSON.parse(cleanedDataString);
-                console.log("updateGraphData: Dados JSON parseados:", parsed);
+                console.log("updateGraphData: Dados JSON parseados para console:", parsed);
             } catch (e) {
-                console.error("updateGraphData: Erro ao parsear JSON no console (não impede exibição se a string for válida):", e, "String recebida:", cleanedDataString);
+                console.error("updateGraphData: Erro ao parsear JSON para console:", e, "String recebida:", cleanedDataString);
             }
         };
 
         // Adiciona um listener para quando a página é completamente carregada
         document.addEventListener('DOMContentLoaded', (event) => {
             console.log("Documento HTML carregado. DOM pronto.");
-            isDomReady = true; // Define a flag para indicar que o DOM está pronto
-
-            // Se houver dados pendentes que chegaram antes do DOM estar pronto, exiba-os agora
-            if (pendingData) {
-                console.log("DOMContentLoaded: Exibindo dados pendentes.");
-                displayData(pendingData);
-                pendingData = null; // Limpa os dados pendentes
-            }
+            // Se houver dados que chegaram antes do DOM estar pronto, exiba-os agora.
+            // displayDataInDom já lida com tentativas repetidas se o DOM não estiver pronto.
+            // Chamar aqui garante que o processo de exibição inicie assim que o DOM estiver pronto.
+            displayDataInDom(); 
         });
 
     </script>
