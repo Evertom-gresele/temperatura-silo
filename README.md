@@ -1,4 +1,4 @@
-<!DOCTYPE 8 html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -174,10 +174,8 @@
                 addLog(`Elementos DOM já estavam encontrados.`, 'info');
             }
             
-            if (dataHasBeenProcessed) {
-                addLog("Dados já foram processados e exibidos. Nenhuma ação adicional.", 'info');
-                return;
-            }
+            // Removida a flag dataHasBeenProcessed para permitir re-renderização sempre que updateGraphData for chamado
+            // O objetivo agora é mostrar *sempre* o último dado recebido
 
             // Lógica para verificar e exibir os dados
             if (latestReceivedData !== null) {
@@ -185,22 +183,22 @@
                 statusMessage.textContent = "Dados recebidos e exibidos:";
                 dataDisplayDiv.innerHTML = ''; // Limpa o conteúdo anterior
 
+                // Seção para exibir o dado bruto (como string)
                 const rawDataSection = document.createElement('div');
                 rawDataSection.className = 'data-section';
-                // Agora exibimos o latestReceivedDataStringified, que é a versão string do dado
-                rawDataSection.innerHTML = '<h2>Conteúdo Bruto Recebido (como string)</h2><pre>' + escapeHtml(latestReceivedDataStringified) + '</pre>';
+                // Usamos latestReceivedDataStringified para garantir que o conteúdo seja uma string formatada
+                rawDataSection.innerHTML = '<h2>Conteúdo Bruto Recebido (como string para exibição)</h2><pre>' + escapeHtml(latestReceivedDataStringified) + '</pre>';
                 dataDisplayDiv.appendChild(rawDataSection);
                 addLog("Conteúdo bruto (como string) adicionado ao DOM. Tipo do original: " + typeof latestReceivedData, 'success');
 
-                // Adicione uma seção para mostrar o objeto JSON parseado, se for um objeto
+                // Seção para exibir o dado parseado como Objeto JS (se for um objeto)
                 if (typeof latestReceivedData === 'object' && latestReceivedData !== null) {
                     try {
                         const parsedDataSection = document.createElement('div');
                         parsedDataSection.className = 'data-section';
-                        // Tenta stringificar o objeto para exibição formatada
-                        parsedDataSection.innerHTML = '<h2>Conteúdo Bruto Recebido (parseado como Objeto JS, se for JSON)</h2><pre>' + escapeHtml(JSON.stringify(latestReceivedData, null, 2)) + '</pre>';
+                        parsedDataSection.innerHTML = '<h2>Conteúdo Bruto Recebido (Objeto JS)</h2><pre>' + escapeHtml(JSON.stringify(latestReceivedData, null, 2)) + '</pre>';
                         dataDisplayDiv.appendChild(parsedDataSection);
-                        addLog("Conteúdo JSON parseado (objeto) adicionado ao DOM.", 'success');
+                        addLog("Conteúdo JSON parseado (objeto JS) adicionado ao DOM.", 'success');
                     } catch (e) {
                         addLog(`Erro ao stringificar o objeto para exibição: ${e.message}`, 'error');
                         const errorSection = document.createElement('div');
@@ -209,10 +207,10 @@
                         dataDisplayDiv.appendChild(errorSection);
                     }
                 } else {
-                    addLog("O dado recebido não é um objeto JSON.", 'info');
+                    addLog("O dado recebido NÃO é um objeto JavaScript.", 'info');
                 }
 
-                dataHasBeenProcessed = true;
+                // dataHasBeenProcessed = true; // Removido para permitir atualização contínua
                 addLog("Exibição de dados concluída.", 'success');
             } else {
                 addLog("Dados enviados pelo FlutterFlow NÃO encontrados em `latestReceivedData`. Aguardando...", 'warn');
@@ -227,18 +225,15 @@
             
             latestReceivedData = data; // Armazena o dado como ele chegou (objeto, string, etc.)
 
-            // Tenta stringificar o dado para exibição.
+            // Tenta stringificar o dado para exibição no HTML.
             // JSON.stringify é seguro para objetos e valores simples (strings, numbers, booleans)
-            // Se 'data' for um objeto, JSON.stringify o converterá para uma string JSON.
-            // Se 'data' já for uma string, JSON.stringify a colocará entre aspas, o que pode ser interessante para ver.
-            // Para garantir que a string seja *sempre* uma string JSON, podemos checar o tipo.
             if (typeof data === 'object' && data !== null) {
                 try {
                     latestReceivedDataStringified = JSON.stringify(data, null, 2); // Formata para legibilidade
                     addLog("Objeto recebido stringificado para exibição como JSON.", 'success');
                 } catch (e) {
-                    latestReceivedDataStringified = String(data); // Fallback se JSON.stringify falhar
-                    addLog(`Erro ao stringificar o objeto recebido: ${e.message}. Armazenando como String(data).`, 'error');
+                    latestReceivedDataStringified = String(data); // Fallback se JSON.stringify falhar (objeto circular, etc.)
+                    addLog(`Erro ao stringificar o objeto recebido para exibição: ${e.message}. Armazenando como String(data).`, 'error');
                 }
             } else if (typeof data === 'string') {
                 latestReceivedDataStringified = data; // Se já é string, armazena como está
@@ -251,14 +246,19 @@
             addLog(`latestReceivedData (tipo: ${typeof latestReceivedData}) ATUALIZADO em updateGraphData.`, 'info');
             addLog(`latestReceivedDataStringified (para exibição): ${latestReceivedDataStringified.substring(0, Math.min(latestReceivedDataStringified.length, 100))}...`, 'info');
 
-            // Imediatamente tenta exibir os dados após recebê-los
-            attemptToDisplayData();
+            // *** Chamada explícita e atrasada de attemptToDisplayData para garantir que o DOM esteja pronto ***
+            // Usar setTimeout para dar tempo ao DOM de processar as mudanças, se houver
+            // Isso pode resolver o problema de nada aparecer na tela.
+            setTimeout(() => {
+                attemptToDisplayData();
+            }, 50); // Pequeno atraso de 50ms
         };
 
         // Adiciona um listener para quando a página é completamente carregada
         document.addEventListener('DOMContentLoaded', (event) => {
             addLog("Evento DOMContentLoaded disparado. Documento HTML carregado. DOM pronto.", 'success');
             
+            // Inicia o intervalo de re-tentativa para DOM e dados a cada 1 segundo
             if (!renderAttemptInterval) {
                 renderAttemptInterval = setInterval(attemptToDisplayData, 1000);
                 addLog("Intervalo de re-tentativa (1s) iniciado para DOM e dados.", 'info');
@@ -266,6 +266,7 @@
                 addLog("Intervalo de re-tentativa já estava ativo.", 'info');
             }
             
+            // Faz uma tentativa imediata após o DOM estar pronto
             attemptToDisplayData(); 
         });
 
