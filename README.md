@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE2 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -139,3 +139,4 @@
     <pre id="jsonOutput">Aguardando dados...</pre>
 </body>
 </html>
+
