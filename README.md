@@ -1,9 +1,9 @@
-<!DOCTYPE 10 html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dados do Silo - Sincronização Flexível</title>
+    <title>Dados do Silo - Teste Final de DOM</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -32,11 +32,17 @@
         }
         #status-message {
             font-weight: bold;
-            color: #d63384; /* Um pouco mais visível para o status */
+            color: #d63384;
         }
         .error-message {
             color: #dc3545;
             font-weight: bold;
+        }
+        .test-output {
+            margin-top: 20px;
+            padding: 10px;
+            border: 2px dashed orange;
+            background-color: #fffacd;
         }
     </style>
 </head>
@@ -47,32 +53,43 @@
     <div id="data-display">
         </div>
 
-    <script>
-        let latestReceivedData = null; // Armazena sempre o último dado recebido bruto (string JSON)
-        let renderAttemptInterval = null; // Para controlar o intervalo de tentativas de renderização
+    <div class="test-output">
+        <h2>Teste de Acesso ao DOM (Este deve aparecer!)</h2>
+        <p>Se você vir esta mensagem, o HTML está sendo carregado corretamente.</p>
+        <div id="runtime-content"></div>
+    </div>
 
-        // Função auxiliar para escapar HTML (segurança básica)
+    <script>
+        let latestReceivedData = null; 
+        let renderAttemptInterval = null; 
+        let domAccessAttempts = 0; // Contador para depuração
+
         function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
             return text.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
 
-        // Função para tentar exibir os dados no DOM
         function attemptToDisplayData() {
+            domAccessAttempts++;
             const dataDisplayDiv = document.getElementById('data-display');
             const statusMessage = document.getElementById('status-message');
+            const runtimeContentDiv = document.getElementById('runtime-content'); // Novo elemento de teste
 
-            // 1. Verificar se os elementos DOM essenciais estão disponíveis
-            if (!dataDisplayDiv || !statusMessage) {
-                console.warn("attemptToDisplayData: Elementos DOM (data-display ou status-message) não encontrados. Re-tentando em 1 segundo...");
-                // Não inicia o intervalo aqui, a função `updateGraphData` ou `DOMContentLoaded` o fará.
-                return; // Sai e espera a próxima tentativa via intervalo.
+            if (!dataDisplayDiv || !statusMessage || !runtimeContentDiv) {
+                console.warn(`attemptToDisplayData: Tentativa ${domAccessAttempts}. Elementos DOM não encontrados. Re-tentando em 1 segundo...`);
+                // Adiciona um elemento simples ao corpo para testar o DOM mais primitivamente
+                if (document.body && !document.getElementById('body-test-div')) {
+                    const testDiv = document.createElement('div');
+                    testDiv.id = 'body-test-div';
+                    testDiv.textContent = `Teste de body.appendChild: Tentativa ${domAccessAttempts}. DOM elements not found yet.`;
+                    testDiv.style.border = '1px solid blue';
+                    testDiv.style.margin = '5px';
+                    document.body.appendChild(testDiv);
+                    console.log("attemptToDisplayData: Adicionado div de teste ao body.");
+                } else if (document.getElementById('body-test-div')) {
+                    document.getElementById('body-test-div').textContent = `Teste de body.appendChild: Tentativa ${domAccessAttempts}. DOM elements not found yet.`;
+                }
+                return;
             }
 
             // Se chegamos aqui, o DOM está pronto. Parar as re-tentativas.
@@ -82,42 +99,39 @@
                 console.log("attemptToDisplayData: Elementos DOM encontrados e intervalo de re-tentativa parado.");
             }
             
-            // 2. Verificar se há dados para exibir
+            // Adiciona uma mensagem de sucesso no elemento de teste runtime-content
+            runtimeContentDiv.innerHTML = `<p style="color: green; font-weight: bold;">Sucesso! Elementos DOM encontrados após ${domAccessAttempts} tentativas.</p>`;
+
+            // ... (Restante da lógica de exibição de dados, que é a mesma do código anterior) ...
             if (!latestReceivedData) {
                 console.log("attemptToDisplayData: DOM pronto, mas nenhum dado recebido ainda. Exibindo mensagem de aguardo.");
                 statusMessage.textContent = "Aguardando dados...";
-                dataDisplayDiv.innerHTML = ''; // Limpa qualquer conteúdo anterior se não houver dados.
+                dataDisplayDiv.innerHTML = ''; 
                 return; 
             }
 
-            // Se chegamos aqui, o DOM está pronto e há dados. Proceder com a exibição.
             console.log("attemptToDisplayData: DOM pronto e dados disponíveis. Exibindo dados.");
             statusMessage.textContent = "Dados recebidos e exibidos:";
-            dataDisplayDiv.innerHTML = ''; // Limpa o conteúdo anterior
+            dataDisplayDiv.innerHTML = ''; 
 
-            // Exibir a string JSON bruta
             const rawDataSection = document.createElement('div');
             rawDataSection.className = 'data-section';
             rawDataSection.innerHTML = '<h2>Dados Brutos (String JSON)</h2><pre>' + escapeHtml(latestReceivedData) + '</pre>';
             dataDisplayDiv.appendChild(rawDataSection);
 
-            // Tentar exibir dados parseados de forma mais amigável
             try {
                 const parsed = JSON.parse(latestReceivedData);
 
-                // Exibir distribuicaoCabos
                 const distCabosSection = document.createElement('div');
                 distCabosSection.className = 'data-section';
                 distCabosSection.innerHTML = '<h2>distribuicaoCabos</h2><pre>' + escapeHtml(JSON.stringify(parsed.distribuicaoCabos, null, 2)) + '</pre>';
                 dataDisplayDiv.appendChild(distCabosSection);
 
-                // Exibir alturaCabos
                 const alturaCabosSection = document.createElement('div');
                 alturaCabosSection.className = 'data-section';
                 alturaCabosSection.innerHTML = '<h2>alturaCabos</h2><pre>' + escapeHtml(JSON.stringify(parsed.alturaCabos, null, 2)) + '</pre>';
                 dataDisplayDiv.appendChild(alturaCabosSection);
 
-                // Exibir leiturasTemperatura
                 const leiturasTempSection = document.createElement('div');
                 leiturasTempSection.className = 'data-section';
                 leiturasTempSection.innerHTML = '<h2>leiturasTemperatura</h2><pre>' + escapeHtml(JSON.stringify(parsed.leiturasTemperatura, null, 2)) + '</pre>';
@@ -131,26 +145,21 @@
             }
         }
 
-        // Esta é a função que o FlutterFlow irá chamar
         window.updateGraphData = function(data) {
             console.log("updateGraphData: Função chamada com dados brutos do FlutterFlow:", data);
             
             let cleanedDataString = data;
-            // Se o FlutterFlow envia a string JSON já encadeada com aspas (ex: '"{\"key\":\"value\"}"'), remove as aspas extras
             if (typeof data === 'string' && data.startsWith('"') && data.endsWith('"')) {
                 cleanedDataString = data.substring(1, data.length - 1);
                 console.log("updateGraphData: String JSON limpa (removidas aspas extras):", cleanedDataString);
             }
             
-            latestReceivedData = cleanedDataString; // Armazena sempre o dado mais recente
-            console.log("updateGraphData: Dados armazenados em latestReceivedData.");
+            latestReceivedData = cleanedDataString; 
+            console.log("updateGraphData: Dados armazenados em latestReceivedData. Tentando exibir...");
 
-            // Inicia a tentativa de renderização imediatamente, e se não conseguir,
-            // um intervalo de 1 segundo será iniciado/mantido pela chamada inicial
-            // de DOMContentLoaded ou por chamadas anteriores.
+            // Tenta exibir imediatamente. Se não conseguir, o setInterval se encarregará.
             attemptToDisplayData();
 
-            // Opcional: Tentar parsear para confirmar se é JSON válido para depuração no console
             try {
                 const parsed = JSON.parse(cleanedDataString);
                 console.log("updateGraphData: Dados JSON parseados para console:", parsed);
@@ -159,20 +168,18 @@
             }
         };
 
-        // Adiciona um listener para quando a página é completamente carregada
         document.addEventListener('DOMContentLoaded', (event) => {
             console.log("Documento HTML carregado. DOM pronto. Iniciando/Reiniciando tentativas de exibição.");
             
             // Inicia o intervalo de re-tentativa se ainda não estiver ativo
             if (!renderAttemptInterval) {
-                renderAttemptInterval = setInterval(attemptToDisplayData, 1000); // Tenta a cada 1 segundo
+                renderAttemptInterval = setInterval(attemptToDisplayData, 1000); 
             }
             
             // Faz uma tentativa imediata após o DOM estar pronto
             attemptToDisplayData(); 
         });
 
-        // Limpa o intervalo se o iframe for descarregado
         window.addEventListener('beforeunload', () => {
             if (renderAttemptInterval) {
                 clearInterval(renderAttemptInterval);
