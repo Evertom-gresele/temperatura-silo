@@ -1,4 +1,4 @@
-<!DOCTYPE 3 html>
+<!DOCTYPE 4 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -37,7 +37,7 @@
         let objectsToRemove = []; // Array para armazenar objetos a serem removidos na atualização
 
         // Configurações do silo
-        const coneHeight = 3; // Altura do cone superior
+        const coneHeight = 8; // Altura do cone superior (AJUSTADO PARA SER MAIS ALTO)
         const pointSpacing = configuracao.distanciaEntrePontosDeLeitura; // Espaçamento vertical entre pontos de temperatura
 
         // Mapa de cores para interpolação de temperaturas
@@ -51,60 +51,34 @@
         ];
 
         // DADOS DE EXEMPLO ATUALIZADOS com os valores que você forneceu!
+        // ESTES SÃO APENAS DADOS INICIAIS, SERÃO SOBRESCRITOS PELOS DADOS DO FLUTTERFLOW
         const initialParsedData = {
             distribuicaoCabos: {
-                
-			// --- CÓDIGO PARA distribuicaoCabos ---
-if (parsedData.distribuicaoCabos) {
-    for (const key in parsedData.distribuicaoCabos) {
-        if (distribuicaoCabos.hasOwnProperty(key)) { // Garante que a chave existe no objeto global
-            distribuicaoCabos[key] = parsedData.distribuicaoCabos[key];
-        }
-    }
-    console.log("distribuicaoCabos atualizado:", distribuicaoCabos);
-} else {
-    console.warn("parsedData.distribuicaoCabos não encontrado.");
-}
-
+                "linha_1": 1,
+                "linha_2": 3,
+                "linha_3": 6,
+                "linha_4": 0,
+                "linha_5": 0
             },
             alturaCabos: {
-                
-// --- CÓDIGO PARA alturaCabos ---
-if (parsedData.alturaCabos) {
-    for (const key in parsedData.alturaCabos) {
-        if (alturaCabos.hasOwnProperty(key)) { // Garante que a chave existe no objeto global
-            alturaCabos[key] = parsedData.alturaCabos[key];
-        }
-    }
-    console.log("alturaCabos atualizado:", alturaCabos);
-} else {
-    console.warn("parsedData.alturaCabos não encontrado.");
-}
-
+                "cabo_1": 16,
+                "cabo_2": 14,
+                "cabo_3": 14,
+                "cabo_4": 14,
+                "cabo_5": 0,
+                "cabo_6": 0,
+                "cabo_7": 0,
+                "cabo_8": 0,
+                "cabo_9": 0,
+                "cabo_10": 0,
+                "cabo_11": 0,
+                "cabo_12": 0,
             },
             leiturasTemperatura: {
-                
-// --- CÓDIGO PARA leiturasTemperatura ---
-if (parsedData.leiturasTemperatura) {
-    // Limpa o objeto global antes de preencher, caso os cabos mudem
-    for (const key in leiturasTemperatura) {
-        delete leiturasTemperatura[key];
-    }
-
-    for (const key in parsedData.leiturasTemperatura) {
-        if (Array.isArray(parsedData.leiturasTemperatura[key])) { // Garante que é um array
-            leiturasTemperatura[key] = parsedData.leiturasTemperatura[key];
-        } else {
-            console.warn(`leiturasTemperatura['${key}'] não é um array válido.`);
-        }
-    }
-    console.log("leiturasTemperatura atualizado:", leiturasTemperatura);
-} else {
-    console.warn("parsedData.leiturasTemperatura não encontrado.");
-}
-
-
-
+                "cabo_1": [10, 12, 15, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
+                "cabo_2": [15, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
+                "cabo_3": [20, 22, 25, 26, 15, 28, 30, 32, 35, 38, 40, 42, 45, 48],
+                "cabo_4": [25, 28, 29, 26, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
             }
         };
 
@@ -128,16 +102,17 @@ if (parsedData.leiturasTemperatura) {
         }
 
         // Função para criar os cabos e pontos de temperatura
-        function createSiloCables(parsedData, siloHeightOffset) {
-            const distribuicaoCabos = parsedData.distribuicaoCabos;
-            const alturaCabos = parsedData.alturaCabos;
-            const leiturasTemperatura = parsedData.leiturasTemperatura;
+        function createSiloCables(dataFromParsed, siloHeightOffset) { // Renomeado para clareza
+            // Esta função agora usa os dados passados como argumento
+            const distribuicaoCabosLocal = dataFromParsed.distribuicaoCabos;
+            const alturaCabosLocal = dataFromParsed.alturaCabos;
+            const leiturasTemperaturaLocal = dataFromParsed.leiturasTemperatura;
 
             let currentCableIndex = 0;
             
             // Loop para linha_1 a linha_5
             for (let i = 1; i <= 5; i++) { // i representa o número da linha concêntrica (1 para central, 2 para o primeiro anel, etc.)
-                const numCablesInLine = distribuicaoCabos[`linha_${i}`] || 0;
+                const numCablesInLine = distribuicaoCabosLocal[`linha_${i}`] || 0;
                 
                 if (numCablesInLine > 0) {
                     let cableRadius;
@@ -165,8 +140,8 @@ if (parsedData.leiturasTemperatura) {
                             cableZ = Math.sin(cableAngle) * cableRadius;
                         }
 
-                        const numPoints = alturaCabos[`cabo_${currentCableIndex}`] || 0;
-                        const temperatures = leiturasTemperatura[`cabo_${currentCableIndex}`] || [];
+                        const numPoints = alturaCabosLocal[`cabo_${currentCableIndex}`] || 0;
+                        const temperatures = leiturasTemperaturaLocal[`cabo_${currentCableIndex}`] || [];
 
                         // Cria o cabo (linha)
                         const cableMaterial = new THREE.LineBasicMaterial({ color: 0x888888 });
@@ -341,23 +316,71 @@ if (parsedData.leiturasTemperatura) {
                     side: THREE.DoubleSide
                 });
 
-                // Obter novo raio e altura a partir dos dados
+                // --- CÓDIGO PARA distribuicaoCabos - COLOCADO AQUI, NO LUGAR CERTO ---
+                if (parsedData.distribuicaoCabos) {
+                    for (const key in parsedData.distribuicaoCabos) {
+                        // Garante que a chave existe no objeto global antes de atribuir
+                        if (initialParsedData.distribuicaoCabos.hasOwnProperty(key)) { 
+                            initialParsedData.distribuicaoCabos[key] = parsedData.distribuicaoCabos[key];
+                        }
+                    }
+                    console.log("distribuicaoCabos atualizado (global):", initialParsedData.distribuicaoCabos);
+                } else {
+                    console.warn("parsedData.distribuicaoCabos não encontrado.");
+                }
+
+                // --- CÓDIGO PARA alturaCabos - COLOCADO AQUI, NO LUGAR CERTO ---
+                if (parsedData.alturaCabos) {
+                    for (const key in parsedData.alturaCabos) {
+                        // Garante que a chave existe no objeto global antes de atribuir
+                        if (initialParsedData.alturaCabos.hasOwnProperty(key)) {
+                            initialParsedData.alturaCabos[key] = parsedData.alturaCabos[key];
+                        }
+                    }
+                    console.log("alturaCabos atualizado (global):", initialParsedData.alturaCabos);
+                } else {
+                    console.warn("parsedData.alturaCabos não encontrado.");
+                }
+
+                // --- CÓDIGO PARA leiturasTemperatura - COLOCADO AQUI, NO LUGAR CERTO ---
+                if (parsedData.leiturasTemperatura) {
+                    // Limpa o objeto global antes de preencher, caso os cabos mudem dinamicamente
+                    for (const key in initialParsedData.leiturasTemperatura) {
+                        delete initialParsedData.leiturasTemperatura[key];
+                    }
+
+                    for (const key in parsedData.leiturasTemperatura) {
+                        if (Array.isArray(parsedData.leiturasTemperatura[key])) { // Garante que é um array
+                            initialParsedData.leiturasTemperatura[key] = parsedData.leiturasTemperatura[key];
+                        } else {
+                            console.warn(`leiturasTemperatura['${key}'] não é um array válido.`);
+                        }
+                    }
+                    console.log("leiturasTemperatura atualizado (global):", initialParsedData.leiturasTemperatura);
+                } else {
+                    console.warn("parsedData.leiturasTemperatura não encontrado.");
+                }
+
+
+                // Obter novo raio e altura a partir dos dados ATUALIZADOS
                 let newMaxCableHeight = 0;
                 let numberOfActiveLines = 0; // Para calcular o raio do silo
 
+                // IMPORTANTE: Agora, use initialParsedData.distribuicaoCabos para calcular numberOfActiveLines
                 for (let i = 1; i <= 5; i++) {
-                    const numCablesInLine = parsedData.distribuicaoCabos[`linha_${i}`] || 0;
+                    const numCablesInLine = initialParsedData.distribuicaoCabos[`linha_${i}`] || 0;
                     if (numCablesInLine > 0) {
                         numberOfActiveLines++; // Contamos as linhas ativas
                     }
                 }
 
                 let currentCableIndexCheck = 0;
+                // IMPORTANTE: Agora, use initialParsedData.distribuicaoCabos e initialParsedData.alturaCabos
                 for (let i = 1; i <= 5; i++) {
-                    const numCablesInLine = parsedData.distribuicaoCabos[`linha_${i}`] || 0;
+                    const numCablesInLine = initialParsedData.distribuicaoCabos[`linha_${i}`] || 0;
                     for (let j = 0; j < numCablesInLine; j++) {
                         currentCableIndexCheck++;
-                        const alturaDoCabo = parsedData.alturaCabos[`cabo_${currentCableIndexCheck}`] || 0;
+                        const alturaDoCabo = initialParsedData.alturaCabos[`cabo_${currentCableIndexCheck}`] || 0;
                         if (alturaDoCabo > newMaxCableHeight) {
                             newMaxCableHeight = alturaDoCabo;
                         }
@@ -369,13 +392,14 @@ if (parsedData.leiturasTemperatura) {
 
                 const basePlateHeight = 1; // Já é uma constante global
                 const cylinderOffsetFromBase = basePlateHeight; // Os cabos começam acima da base
+                // CORRIGIDO: newSiloCylinderHeight agora usa pointSpacing
                 const newSiloCylinderHeight = newMaxCableHeight * pointSpacing; // A altura do cilindro é baseada na altura máxima dos cabos.
                                                                                 // O offset da base é tratado na posição Y.
 
                 let currentSiloRadius = 0;
                 if (numberOfActiveLines === 0) {
                     currentSiloRadius = configuracao.distanciaDoUltimoAnelDaParede; // Raio padrão se não houver cabos
-                } else if (numberOfActiveLines === 1 && parsedData.distribuicaoCabos["linha_1"] === 1) {
+                } else if (numberOfActiveLines === 1 && initialParsedData.distribuicaoCabos["linha_1"] === 1) {
                     // Apenas cabo central: raio do silo = distanciaDoUltimoAnelDaParede (5)
                     currentSiloRadius = configuracao.distanciaDoUltimoAnelDaParede;
                 }
@@ -403,8 +427,20 @@ if (parsedData.leiturasTemperatura) {
                 siloBasePlate.position.y = 0;
                 // O material da base não muda, então não precisamos atribuir novamente
 
-                // Chamar createSiloCables com os NOVOS dados e o offset correto
-                createSiloCables(parsedData, cylinderOffsetFromBase);
+                // Chamar createSiloCables. Agora, `createSiloCables` deve usar initialParsedData
+                // ou ser ajustada para receber os dados individualmente.
+                // Vou ajustar `createSiloCables` para usar os objetos globais initialParsedData.
+                // OU, como `parsedData` já é o objeto completo, podemos passá-lo.
+                // Mantenha `createSiloCables(parsedData, cylinderOffsetFromBase);` se ela estiver
+                // lendo `parsedData.distribuicaoCabos` etc.
+                // Se a função `createSiloCables` foi ajustada para usar as variáveis globais
+                // (como `distribuicaoCabos`, `alturaCabos`, `leiturasTemperatura`),
+                // então a chamada seria `createSiloCables(cylinderOffsetFromBase);`
+                // No entanto, seu código original usa `parsedData`, então vou manter isso.
+                // O importante é que os objetos globais `initialParsedData.distribuicaoCabos`, etc.
+                // foram atualizados ANTES desta chamada.
+                
+                createSiloCables(parsedData, cylinderOffsetFromBase); // Mantendo como está no seu código original
 
                 // A altura total visual do silo (para o AxesHelper e câmera)
                 const totalSiloVisualHeight = newSiloCylinderHeight + coneHeight + basePlateHeight;
