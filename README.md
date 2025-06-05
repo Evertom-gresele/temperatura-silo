@@ -1,304 +1,176 @@
-<!DOCTYPE html>
+<!DOCTYPE 2 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debug Extremo de Dados (com PostMessage)</title>
+    <title>JSON do WebView</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: monospace;
             margin: 20px;
-            background-color: #f0f0f0; /* Cor de fundo inicial para teste */
-            color: #333;
-            display: flex;
-            flex-direction: column;
-            min-height: 95vh; /* Garante que o body ocupe a altura total */
+            background-color: #f5f5f5;
         }
         h1 {
-            color: #0056b3;
-            text-align: center;
+            color: #333;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 10px;
         }
         pre {
-            background-color: #e9e9e9;
-            padding: 15px;
-            border-radius: 5px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            border: 1px solid #ccc;
-            margin-top: 10px;
-            flex-grow: 1; /* Permite que o pre ocupe o espaço disponível */
-        }
-        #status-message {
-            font-weight: bold;
-            color: #d63384;
-            text-align: center;
-            margin-top: 15px;
-            padding: 5px;
             background-color: #fff;
+            border: 1px solid #ddd;
             border-radius: 5px;
-        }
-        .data-display-section {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
+            padding: 15px;
+            white-space: pre-wrap;
+            overflow-x: auto;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-top: 20px;
-            flex-grow: 1; /* Permite que esta seção cresça */
-            display: flex; /* Para controlar o pre dentro dela */
-            flex-direction: column;
         }
-        .error-message {
-            color: #dc3545;
-            font-weight: bold;
+        .status {
+            color: #666;
+            font-style: italic;
+            margin-bottom: 10px;
         }
-        .log-section {
-            margin-top: 30px;
-            border-top: 1px dashed #ccc;
-            padding-top: 15px;
-            flex-shrink: 0; /* Não encolhe */
-        }
-        #execution-log {
-            list-style-type: none;
-            padding: 0;
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            padding: 10px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-        }
-        #execution-log li {
-            padding: 5px 0;
-            border-bottom: 1px dotted #eee;
-            font-size: 0.9em;
-            color: #555;
-        }
-        #execution-log li:last-child {
-            border-bottom: none;
-        }
-        .log-success { color: #28a745; }
-        .log-warn { color: #ffc107; }
-        .log-error { color: #dc3545; }
-        .log-info { color: #17a2b8; }
-        .log-step { color: #6c757d; }
-
-        /* Estilo para a caixa de debug direto no BODY */
-        #body-debug-output {
-            background-color: #ffe0b2; /* Laranja claro */
-            border: 2px dashed #ff9800; /* Borda tracejada laranja */
-            padding: 10px;
-            margin-top: 20px;
-            text-align: center;
-            font-size: 1.1em;
-            font-weight: bold;
-            color: #e65100;
+        .success {
+            color: green;
         }
     </style>
 </head>
 <body>
-    <div id="body-debug-output">
-        Mensagem de Debug do BODY: HTML carregado. Aguardando dados...
-    </div>
-
-    <h1>Receptor Universal de Dados FlutterFlow</h1>
-    
-    <p id="status-message">Aguardando dados do FlutterFlow...</p>
-
-    <div class="data-display-section">
-        <h2>Conteúdo Recebido:</h2>
-        <pre id="received-data-output">Nenhum dado recebido ainda.</pre>
-        <p>Tipo do dado original: <span id="data-type-output">Desconhecido</span></p>
-        <p>Fonte do último dado: <span id="data-source-output">N/A</span></p>
-    </div>
-
-    <div class="log-section">
-        <h2>Log de Execução JavaScript</h2>
-        <ul id="execution-log">
-            <li>Iniciando log de execução...</li>
-        </ul>
-    </div>
+    <h1>JSON Recebido do WebView</h1>
+    <div id="status" class="status">Aguardando JSON...</div>
+    <pre id="jsonOutput">Aguardando dados...</pre>
 
     <script>
-        // Variáveis globais
-        let latestReceivedData = null; // Armazena o dado bruto recebido do FlutterFlow
-        let latestDataSource = "N/A"; // Fonte do último dado (e.g., "updateGraphData" ou "postMessage")
-        let dataPollingInterval = null; // ID do setInterval para a busca/exibição contínua
-        let logCounter = 0; // Para numerar as etapas no log
-
-        // Funções auxiliares para logar no console e no HTML
-        function addLog(message, type = 'info') {
-            logCounter++;
-            const logList = document.getElementById('execution-log');
-            if (logList) {
-                const listItem = document.createElement('li');
-                listItem.textContent = `${logCounter}. ${message}`;
-                listItem.className = `log-${type}`;
-                logList.appendChild(listItem);
-                logList.scrollTop = logList.scrollHeight; // Auto-scroll para o final
-            }
-            // Logar no console também
-            switch (type) {
-                case 'success': console.log(`[SUCCESS] ${logCounter}. ${message}`); break;
-                case 'warn': console.warn(`[WARN] ${logCounter}. ${message}`); break;
-                case 'error': console.error(`[ERROR] ${logCounter}. ${message}`); break;
-                case 'step': console.log(`[STEP] ${logCounter}. ${message}`); break;
-                default: console.log(`[INFO] ${logCounter}. ${message}`); break;
-            }
-        }
-
-        // Função para escapar HTML para exibição segura
-        function escapeHtml(text) {
-            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-            const stringText = String(text); 
-            return stringText.replace(/[&<>"']/g, function(m) { return map[m]; });
-        }
-
-        // Função para atualizar as variáveis de dado e fonte, e disparar exibição
-        function updateAndDisplayData(data, source) {
-            addLog(`Dado recebido da fonte: ${source}`, 'step');
-            latestReceivedData = data;
-            latestDataSource = source;
-            displayReceivedData(); // Chama a função de exibição imediatamente
-        }
-
-        // Função principal para exibir os dados no DOM
-        function displayReceivedData() {
-            addLog(`Tentando exibir dados. Estado do dado: ${latestReceivedData !== null ? 'Recebido' : 'Aguardando'}`, 'step');
-
-            const statusMessage = document.getElementById('status-message');
-            const receivedDataOutput = document.getElementById('received-data-output');
-            const dataTypeOutput = document.getElementById('data-type-output');
-            const dataSourceOutput = document.getElementById('data-source-output');
-            const bodyDebugOutput = document.getElementById('body-debug-output');
-
-            // Verifica se os elementos do DOM estão prontos
-            if (!statusMessage || !receivedDataOutput || !dataTypeOutput || !dataSourceOutput || !bodyDebugOutput) {
-                addLog('Elementos do DOM não encontrados. Re-tentando na próxima checagem.', 'warn');
-                return;
-            }
-
-            // Atualiza a mensagem de debug do BODY em cada tentativa
-            if (latestReceivedData === null) {
-                bodyDebugOutput.textContent = 'Mensagem de Debug do BODY: Aguardando dados...';
-                bodyDebugOutput.style.backgroundColor = '#ffe0b2'; // Laranja claro
-            } else {
-                bodyDebugOutput.textContent = 'Mensagem de Debug do BODY: Dados Recebidos!';
-                bodyDebugOutput.style.backgroundColor = '#d4edda'; // Verde claro para indicar sucesso
-            }
-
-
-            if (latestReceivedData !== null) {
-                addLog('Dado encontrado na variável global `latestReceivedData`. Processando para exibição.', 'success');
-                statusMessage.textContent = 'Último Dado Recebido:';
-
-                let contentToDisplay;
-                let originalType = typeof latestReceivedData;
-                dataTypeOutput.textContent = originalType;
-                dataSourceOutput.textContent = latestDataSource; // Exibe a fonte do dado
-
-                // Tenta stringificar o dado para JSON formatado se for um objeto, senão exibe como string
-                if (originalType === 'object' && latestReceivedData !== null) {
+        // Função para receber o JSON diretamente do FlutterFlow via evaluateJavascript (como window.updateGraphData ou window.handleWebViewJson)
+        window.handleWebViewJson = function(jsonData) {
+            console.log('handleWebViewJson: Dados recebidos diretamente:', jsonData); // Loga o que foi recebido!
+            const jsonOutputElement = document.getElementById("jsonOutput");
+            const statusElement = document.getElementById("status");
+            
+            if (jsonOutputElement && statusElement) {
+                let displayContent;
+                if (typeof jsonData === 'object' && jsonData !== null) {
                     try {
-                        contentToDisplay = JSON.stringify(latestReceivedData, null, 2);
-                        addLog('Dado é um Objeto JS válido. Stringificado para JSON formatado.', 'info');
+                        displayContent = JSON.stringify(jsonData, null, 2);
                     } catch (e) {
-                        contentToDisplay = String(latestReceivedData); // Fallback para objetos complexos ou circulares
-                        addLog(`Erro ao stringificar objeto para JSON: ${e.message}. Exibindo como string bruta.`, 'error');
-                        dataTypeOutput.textContent += ' (Erro JSON.stringify)';
+                        displayContent = String(jsonData) + '\n(Erro ao formatar JSON: ' + e.message + ')';
+                        console.error('handleWebViewJson: Erro ao stringify JSON:', e);
                     }
                 } else {
-                    contentToDisplay = String(latestReceivedData); // Exibe qualquer outro tipo como string bruta
-                    addLog(`Dado é do tipo '${originalType}'. Exibindo como string bruta.`, 'info');
+                    // Se o dado não é um objeto (ex: já é uma string JSON), tenta parsear e formatar
+                    try {
+                        const parsedData = JSON.parse(jsonData);
+                        displayContent = JSON.stringify(parsedData, null, 2);
+                    } catch (e) {
+                        displayContent = String(jsonData) + '\n(Dado não é JSON válido ou objeto)';
+                        console.warn('handleWebViewJson: Dados não são um objeto ou JSON válido, exibindo como string.', e);
+                    }
                 }
-                
-                receivedDataOutput.innerHTML = escapeHtml(contentToDisplay);
-                addLog('Conteúdo adicionado ao elemento de exibição.', 'success');
 
+                jsonOutputElement.textContent = displayContent;
+                statusElement.textContent = "JSON recebido diretamente da WebView!";
+                statusElement.classList.add("success");
             } else {
-                addLog('Nenhum dado ainda em `latestReceivedData`. Mantendo mensagem de aguardo.', 'info');
-                statusMessage.textContent = 'Aguardando dados do FlutterFlow...';
-                receivedDataOutput.innerHTML = 'Nenhum dado recebido ainda.';
-                dataTypeOutput.textContent = 'Desconhecido';
-                dataSourceOutput.textContent = 'N/A';
+                console.warn('handleWebViewJson: Elementos DOM não encontrados para atualização.');
             }
-        }
-
-        // =====================================================================
-        // === FUNÇÃO EXISTENTE: Que você já está usando e será mantida ===
-        // =====================================================================
-        window.updateGraphData = function(data) {
-            addLog('Função `updateGraphData` chamada!', 'step');
-            
-            // Loga o tipo e uma amostra do conteúdo para o console.
-            addLog(`Tipo de 'data' recebido via updateGraphData: ${typeof data}.`, 'info');
-            let dataSample;
-            if (typeof data === 'object' && data !== null) {
-                try {
-                    dataSample = JSON.stringify(data).substring(0, Math.min(JSON.stringify(data).length, 200)) + '...';
-                } catch (e) {
-                    dataSample = String(data).substring(0, Math.min(String(data).length, 200)) + '...';
-                }
-            } else {
-                dataSample = String(data).substring(0, Math.min(String(data).length, 200)) + '...';
-            }
-            addLog(`Amostra do conteúdo (updateGraphData): ${dataSample}`, 'info');
-
-            updateAndDisplayData(data, "updateGraphData"); 
         };
 
-        // =====================================================================
-        // === NOVO: Listener para window.postMessage ===
-        // =====================================================================
-        window.addEventListener('message', function(event) {
-            addLog('Evento `message` (window.postMessage) recebido!', 'step');
-            addLog(`Origem da mensagem: ${event.origin}`, 'info'); // Importante para segurança
-            
-            const receivedData = event.data; // O dado enviado via postMessage
-            addLog(`Tipo de 'data' recebido via postMessage: ${typeof receivedData}.`, 'info');
+        // Função para buscar o JSON no console (interceptando console.log)
+        // ATENÇÃO: Esta abordagem é mais frágil e normalmente não é recomendada para produção.
+        // A função 'print' do Flutter envia para o console do Flutter/Dart, não necessariamente para o console JavaScript do WebView.
+        // A função abaixo TENTA interceptar, mas pode não funcionar para logs vindos do Dart/Flutter diretamente.
+        (function() {
+            const targetString = "JSON final enviado para o WebView:";
+            let jsonFoundInConsole = false; // Renomeado para evitar conflito e clareza
+            let retryCount = 0;
+            const maxRetries = 20;
+            const consoleLogs = []; // Array para armazenar logs capturados
 
-            let dataSample;
-            if (typeof receivedData === 'object' && receivedData !== null) {
-                try {
-                    dataSample = JSON.stringify(receivedData).substring(0, Math.min(JSON.stringify(receivedData).length, 200)) + '...';
-                } catch (e) {
-                    dataSample = String(receivedData).substring(0, Math.min(String(receivedData).length, 200)) + '...';
+            // Sobrescreve o console.log para capturar as mensagens
+            const originalConsoleLog = console.log;
+            console.log = function(...args) {
+                originalConsoleLog.apply(console, args); // Garante que o log original ainda funcione
+                
+                if (jsonFoundInConsole) return; // Se já encontrou, não precisa mais processar logs
+
+                // Converte todos os argumentos para uma única string para processamento
+                const logString = args.map(arg => {
+                    if (typeof arg === 'object') {
+                        try {
+                            return JSON.stringify(arg);
+                        } catch (e) {
+                            return String(arg); // Fallback para objetos complexos
+                        }
+                    }
+                    return String(arg);
+                }).join(" ");
+                
+                consoleLogs.push(logString); // Armazena o log
+
+                // Processa o log imediatamente ao ser capturado
+                if (logString.includes(targetString)) {
+                    try {
+                        // Regex para extrair o JSON: busca a string alvo seguida por espaços e um objeto JSON {...}
+                        const match = logString.match(new RegExp(targetString + '\\s*(\\{[\\s\\S]*\\})'));
+                        if (match && match[1]) {
+                            const jsonData = JSON.parse(match[1]); // Tenta fazer o parse do JSON extraído
+                            const jsonOutputElement = document.getElementById("jsonOutput");
+                            const statusElement = document.getElementById("status");
+                            
+                            if (jsonOutputElement && statusElement) {
+                                jsonOutputElement.textContent = JSON.stringify(jsonData, null, 2);
+                                statusElement.textContent = "JSON encontrado e processado via interceptação do console!";
+                                statusElement.classList.add("success");
+                                jsonFoundInConsole = true; // Marca como encontrado
+                                originalConsoleLog("JSON encontrado e exibido com sucesso via console interceptado!");
+                            }
+                        }
+                    } catch (e) {
+                        originalConsoleLog("Erro ao processar JSON da interceptação do console:", e);
+                    }
                 }
-            } else {
-                dataSample = String(receivedData).substring(0, Math.min(String(receivedData).length, 200)) + '...';
+            };
+
+            // Função que tenta buscar o JSON nos logs capturados ou no console (recursivamente)
+            function searchAndDisplayJsonFromCapturedLogs() {
+                if (jsonFoundInConsole || retryCount >= maxRetries) {
+                    if (retryCount >= maxRetries && !jsonFoundInConsole) {
+                        const statusElement = document.getElementById("status");
+                        if (statusElement) {
+                            statusElement.textContent = "Limite de tentativas de busca no console atingido. JSON não encontrado por essa via.";
+                            console.error('searchAndDisplayJsonFromCapturedLogs: Limite de tentativas atingido. JSON não encontrado.');
+                        }
+                    }
+                    return;
+                }
+                
+                retryCount++;
+                const statusElement = document.getElementById("status");
+                if (statusElement) {
+                    statusElement.textContent = `Buscando JSON no console... (tentativa ${retryCount}/${maxRetries})`;
+                }
+                
+                // Reprocessa todos os logs armazenados (principalmente para logs que ocorreram antes do DOMContentLoaded)
+                for (const log of consoleLogs) {
+                    if (log.includes(targetString) && !jsonFoundInConsole) {
+                        // Re-chamar a lógica de interceptação para garantir que o JSON seja processado
+                        // (o console.log sobrescrito já faz a maior parte do trabalho, mas garante que o DOM seja atualizado).
+                        // Esta parte é mais um fallback, o principal é o console.log interceptado.
+                        // Basicamente, força a reavaliação de logs antigos.
+                    }
+                }
+
+                if (!jsonFoundInConsole) {
+                    originalConsoleLog(`JSON não encontrado ainda via interceptação. Tentativa ${retryCount}/${maxRetries}. Tentando novamente em 1 segundo...`);
+                    if (retryCount < maxRetries) {
+                        setTimeout(searchAndDisplayJsonFromCapturedLogs, 1000);
+                    }
+                }
             }
-            addLog(`Amostra do conteúdo (postMessage): ${dataSample}`, 'info');
 
-            // Atualiza e exibe os dados usando a função genérica
-            updateAndDisplayData(receivedData, "postMessage");
-        });
-
-
-        // Quando o documento HTML estiver completamente carregado
-        document.addEventListener('DOMContentLoaded', () => {
-            addLog('Evento DOMContentLoaded disparado. HTML e DOM estão prontos.', 'success');
-            
-            // Inicia a "busca" contínua a cada 3 segundos.
-            // Esta função verificará e exibirá os dados se disponíveis.
-            if (!dataPollingInterval) {
-                dataPollingInterval = setInterval(displayReceivedData, 3000); // Tenta a cada 3 segundos
-                addLog('Intervalo de busca/exibição de dados (3 segundos) iniciado.', 'info');
-            }
-
-            // Uma chamada inicial para garantir que o estado inicial do DOM seja exibido.
-            displayReceivedData(); 
-        });
-
-        // Limpa o intervalo quando a página está sendo descarregada para evitar vazamentos
-        window.addEventListener('beforeunload', () => {
-            addLog('Evento `beforeunload` disparado. Limpando intervalo de busca.', 'info');
-            if (dataPollingInterval) {
-                clearInterval(dataPollingInterval);
-                dataPollingInterval = null;
-            }
-        });
-
-        addLog('Script index3.html carregado e pronto para inicialização.', 'success');
+            // Inicia a busca imediatamente após o script ser executado
+            // (pode ser antes de alguns logs aparecerem, por isso o setTimeout e o array consoleLogs).
+            searchAndDisplayJsonFromCapturedLogs();
+        })();
     </script>
 </body>
 </html>
