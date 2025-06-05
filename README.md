@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+<!DOCTYPE 2 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dados do Silo - Teste Final de DOM</title>
+    <title>Dados do Silo - Debug Detalhado</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -44,6 +44,23 @@
             border: 2px dashed orange;
             background-color: #fffacd;
         }
+        #execution-log {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+        #execution-log li {
+            padding: 5px 0;
+            border-bottom: 1px dotted #eee;
+            font-size: 0.9em;
+        }
+        .log-success { color: #28a745; }
+        .log-warn { color: #ffc107; }
+        .log-error { color: #dc3545; }
+        .log-info { color: #17a2b8; }
+        .log-step { color: #6c757d; }
     </style>
 </head>
 <body>
@@ -59,10 +76,37 @@
         <div id="runtime-content"></div>
     </div>
 
+    <h2>Log de Execução JavaScript</h2>
+    <ul id="execution-log">
+        <li>Iniciando log de execução...</li>
+    </ul>
+
     <script>
         let latestReceivedData = null; 
         let renderAttemptInterval = null; 
-        let domAccessAttempts = 0; // Contador para depuração
+        let domAccessAttempts = 0; 
+        let logCounter = 0; // Para numerar as etapas no log
+
+        // Funções auxiliares para logar no console e no HTML
+        function addLog(message, type = 'info') {
+            logCounter++;
+            const logList = document.getElementById('execution-log');
+            if (logList) {
+                const listItem = document.createElement('li');
+                listItem.textContent = `${logCounter}. ${message}`;
+                listItem.className = `log-${type}`;
+                logList.appendChild(listItem);
+                logList.scrollTop = logList.scrollHeight; // Scroll to bottom
+            }
+            // Logar no console também
+            switch (type) {
+                case 'success': console.log(`[SUCCESS] ${logCounter}. ${message}`); break;
+                case 'warn': console.warn(`[WARN] ${logCounter}. ${message}`); break;
+                case 'error': console.error(`[ERROR] ${logCounter}. ${message}`); break;
+                case 'step': console.log(`[STEP] ${logCounter}. ${message}`); break;
+                default: console.log(`[INFO] ${logCounter}. ${message}`); break;
+            }
+        }
 
         function escapeHtml(text) {
             const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
@@ -71,125 +115,13 @@
 
         function attemptToDisplayData() {
             domAccessAttempts++;
-            const dataDisplayDiv = document.getElementById('data-display');
-            const statusMessage = document.getElementById('status-message');
-            const runtimeContentDiv = document.getElementById('runtime-content'); // Novo elemento de teste
+            addLog(`Executando attemptToDisplayData. Tentativa: ${domAccessAttempts}.`, 'step');
 
-            if (!dataDisplayDiv || !statusMessage || !runtimeContentDiv) {
-                console.warn(`attemptToDisplayData: Tentativa ${domAccessAttempts}. Elementos DOM não encontrados. Re-tentando em 1 segundo...`);
-                // Adiciona um elemento simples ao corpo para testar o DOM mais primitivamente
-                if (document.body && !document.getElementById('body-test-div')) {
-                    const testDiv = document.createElement('div');
-                    testDiv.id = 'body-test-div';
-                    testDiv.textContent = `Teste de body.appendChild: Tentativa ${domAccessAttempts}. DOM elements not found yet.`;
-                    testDiv.style.border = '1px solid blue';
-                    testDiv.style.margin = '5px';
-                    document.body.appendChild(testDiv);
-                    console.log("attemptToDisplayData: Adicionado div de teste ao body.");
-                } else if (document.getElementById('body-test-div')) {
-                    document.getElementById('body-test-div').textContent = `Teste de body.appendChild: Tentativa ${domAccessAttempts}. DOM elements not found yet.`;
-                }
-                return;
-            }
+            // 1. Tentar acessar elementos DOM
+            const dataDisplayDiv = document.querySelector('#data-display');
+            const statusMessage = document.querySelector('#status-message');
+            const runtimeContentDiv = document.querySelector('#runtime-content');
 
-            // Se chegamos aqui, o DOM está pronto. Parar as re-tentativas.
-            if (renderAttemptInterval) {
-                clearInterval(renderAttemptInterval);
-                renderAttemptInterval = null;
-                console.log("attemptToDisplayData: Elementos DOM encontrados e intervalo de re-tentativa parado.");
-            }
-            
-            // Adiciona uma mensagem de sucesso no elemento de teste runtime-content
-            runtimeContentDiv.innerHTML = `<p style="color: green; font-weight: bold;">Sucesso! Elementos DOM encontrados após ${domAccessAttempts} tentativas.</p>`;
-
-            // ... (Restante da lógica de exibição de dados, que é a mesma do código anterior) ...
-            if (!latestReceivedData) {
-                console.log("attemptToDisplayData: DOM pronto, mas nenhum dado recebido ainda. Exibindo mensagem de aguardo.");
-                statusMessage.textContent = "Aguardando dados...";
-                dataDisplayDiv.innerHTML = ''; 
-                return; 
-            }
-
-            console.log("attemptToDisplayData: DOM pronto e dados disponíveis. Exibindo dados.");
-            statusMessage.textContent = "Dados recebidos e exibidos:";
-            dataDisplayDiv.innerHTML = ''; 
-
-            const rawDataSection = document.createElement('div');
-            rawDataSection.className = 'data-section';
-            rawDataSection.innerHTML = '<h2>Dados Brutos (String JSON)</h2><pre>' + escapeHtml(latestReceivedData) + '</pre>';
-            dataDisplayDiv.appendChild(rawDataSection);
-
-            try {
-                const parsed = JSON.parse(latestReceivedData);
-
-                const distCabosSection = document.createElement('div');
-                distCabosSection.className = 'data-section';
-                distCabosSection.innerHTML = '<h2>distribuicaoCabos</h2><pre>' + escapeHtml(JSON.stringify(parsed.distribuicaoCabos, null, 2)) + '</pre>';
-                dataDisplayDiv.appendChild(distCabosSection);
-
-                const alturaCabosSection = document.createElement('div');
-                alturaCabosSection.className = 'data-section';
-                alturaCabosSection.innerHTML = '<h2>alturaCabos</h2><pre>' + escapeHtml(JSON.stringify(parsed.alturaCabos, null, 2)) + '</pre>';
-                dataDisplayDiv.appendChild(alturaCabosSection);
-
-                const leiturasTempSection = document.createElement('div');
-                leiturasTempSection.className = 'data-section';
-                leiturasTempSection.innerHTML = '<h2>leiturasTemperatura</h2><pre>' + escapeHtml(JSON.stringify(parsed.leiturasTemperatura, null, 2)) + '</pre>';
-                dataDisplayDiv.appendChild(leiturasTempSection);
-
-            } catch (e) {
-                const errorSection = document.createElement('div');
-                errorSection.className = 'data-section';
-                errorSection.innerHTML = '<h2 class="error-message">Erro ao Parsear JSON para Exibição Detalhada</h2><p>String recebida não é um JSON válido.</p><pre class="error-message">' + escapeHtml(latestReceivedData) + '</pre><p class="error-message">Erro: ' + escapeHtml(e.message) + '</p>';
-                dataDisplayDiv.appendChild(errorSection);
-            }
-        }
-
-        window.updateGraphData = function(data) {
-            console.log("updateGraphData: Função chamada com dados brutos do FlutterFlow:", data);
-            
-            let cleanedDataString = data;
-            if (typeof data === 'string' && data.startsWith('"') && data.endsWith('"')) {
-                cleanedDataString = data.substring(1, data.length - 1);
-                console.log("updateGraphData: String JSON limpa (removidas aspas extras):", cleanedDataString);
-            }
-            
-            latestReceivedData = cleanedDataString; 
-            console.log("updateGraphData: Dados armazenados em latestReceivedData. Tentando exibir...");
-
-            // Tenta exibir imediatamente. Se não conseguir, o setInterval se encarregará.
-            attemptToDisplayData();
-
-            try {
-                const parsed = JSON.parse(cleanedDataString);
-                console.log("updateGraphData: Dados JSON parseados para console:", parsed);
-            } catch (e) {
-                console.error("updateGraphData: Erro ao parsear JSON para console:", e, "String recebida:", cleanedDataString);
-            }
-        };
-
-        document.addEventListener('DOMContentLoaded', (event) => {
-            console.log("Documento HTML carregado. DOM pronto. Iniciando/Reiniciando tentativas de exibição.");
-            
-            // Inicia o intervalo de re-tentativa se ainda não estiver ativo
-            if (!renderAttemptInterval) {
-                renderAttemptInterval = setInterval(attemptToDisplayData, 1000); 
-            }
-            
-            // Faz uma tentativa imediata após o DOM estar pronto
-            attemptToDisplayData(); 
-        });
-
-        window.addEventListener('beforeunload', () => {
-            if (renderAttemptInterval) {
-                clearInterval(renderAttemptInterval);
-                renderAttemptInterval = null;
-                console.log("beforeunload: Intervalo de re-tentativa limpo.");
-            }
-        });
-
-        console.log("Script index3.html carregado.");
-
-    </script>
-</body>
-</html>
+            // 2. Logar o conteúdo do body para inspeção
+            if (document.body) {
+                addLog(`Conteúdo do document.body na tentativa ${domAccessAttempts}: ${document.body.innerHTML.
