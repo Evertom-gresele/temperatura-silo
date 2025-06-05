@@ -1,142 +1,76 @@
-<!DOCTYPE2 html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSON do WebView</title>
-    <style>
-        body {
-            font-family: monospace;
-            margin: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 10px;
-        }
-        pre {
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 15px;
-            white-space: pre-wrap;
-            overflow-x: auto;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .status {
-            color: #666;
-            font-style: italic;
-            margin-bottom: 10px;
-        }
-        .success {
-            color: green;
-        }
-    </style>
+<body>
+    <div id="body-debug-output">
+        Mensagem de Debug do BODY: HTML carregado. Aguardando dados...
+    </div>
+
+    <h1>Receptor Universal de Dados FlutterFlow</h1>
+    
+    <p id="status-message">Aguardando dados do FlutterFlow...</p>
+
+    <div class="data-display-section">
+        <h2>Conteúdo Recebido:</h2>
+        <pre id="received-data-output">Nenhum dado recebido ainda.</pre>
+        <p>Tipo do dado original: <span id="data-type-output">Desconhecido</span></p>
+        <p>Fonte do último dado: <span id="data-source-output">N/A</span></p>
+    </div>
+
+    <div class="log-section">
+        <h2>Log de Execução JavaScript</h2>
+        <ul id="execution-log">
+            <li>Iniciando log de execução...</li>
+        </ul>
+    </div>
+
     <script>
-        const targetString = "JSON final enviado para o WebView:";
-        let jsonOutputElement; // Será inicializado após o DOM carregar
-        let statusElement;     // Será inicializado após o DOM carregar
-        let jsonFound = false;
-        let retryCount = 0;
-        const maxRetries = 20; // Limite máximo de tentativas
+        // ... (funções addLog, escapeHtml, updateAndDisplayData, displayReceivedData como antes) ...
 
-        // Array para armazenar logs do console
-        const consoleLogs = [];
-
-        // Sobrescreve o console.log para capturar as mensagens
-        const originalConsoleLog = console.log;
-        console.log = function(...args) {
-            originalConsoleLog.apply(console, args);
-            
-            // Converte todos os argumentos para uma única string para processamento robusto
-            const logString = args.map(arg => {
-                if (typeof arg === 'object') {
-                    return JSON.stringify(arg);
+        // =====================================================================
+        // === FUNÇÃO EXISTENTE: Que você já está usando e será mantida ===
+        // =====================================================================
+        window.updateGraphData = function(data) {
+            addLog('Função `updateGraphData` chamada!', 'step');
+            addLog(`Tipo de 'data' recebido via updateGraphData: ${typeof data}.`, 'info');
+            let dataSample;
+            if (typeof data === 'object' && data !== null) {
+                try {
+                    dataSample = JSON.stringify(data).substring(0, Math.min(JSON.stringify(data).length, 200)) + '...';
+                } catch (e) {
+                    dataSample = String(data).substring(0, Math.min(String(data).length, 200)) + '...';
                 }
-                return String(arg);
-            }).join(" ");
-            
-            consoleLogs.push(logString);
-            processConsoleLogs(); // Processa logs imediatamente
+            } else {
+                dataSample = String(data).substring(0, Math.min(String(data).length, 200)) + '...';
+            }
+            addLog(`Amostra do conteúdo (updateGraphData): ${dataSample}`, 'info');
+
+            updateAndDisplayData(data, "updateGraphData"); 
         };
 
-        function processConsoleLogs() {
-            if (jsonFound) return; // Se o JSON já foi encontrado, não faz nada
+        // =====================================================================
+        // === NOVO: Listener para window.postMessage ===
+        // =====================================================================
+        window.addEventListener('message', function(event) {
+            addLog('Evento `message` (window.postMessage) recebido!', 'step');
+            addLog(`Origem da mensagem: ${event.origin}`, 'info'); 
             
-            for (const log of consoleLogs) {
-                if (log.includes(targetString)) {
-                    try {
-                        // Regex para capturar o JSON que está em formato de string
-                        // Procura por '{' e '}' que delimitam o objeto JSON
-                        const match = log.match(new RegExp(targetString + '\\s*(\\{[\\s\\S]*\\})'));
-                        
-                        if (match && match[1]) {
-                            const jsonData = JSON.parse(match[1]);
-                            // Garante que os elementos do DOM existam antes de tentar acessá-los
-                            if (jsonOutputElement && statusElement) {
-                                jsonOutputElement.textContent = JSON.stringify(jsonData, null, 2);
-                                statusElement.textContent = "JSON encontrado e processado com sucesso!";
-                                statusElement.classList.add("success");
-                                jsonFound = true;
-                                originalConsoleLog("JSON encontrado e exibido com sucesso!");
-                                // Limpa os logs para evitar reprocessamento desnecessário
-                                consoleLogs.length = 0;
-                                return; // Sai da função assim que encontrar
-                            }
-                        }
-                    } catch (e) {
-                        originalConsoleLog("Erro ao parsear JSON de log:", e);
-                        if (statusElement) {
-                            statusElement.textContent = "Erro ao processar JSON: " + e.message;
-                        }
-                    }
+            const receivedData = event.data; // O dado enviado via postMessage
+            addLog(`Tipo de 'data' recebido via postMessage: ${typeof receivedData}.`, 'info');
+
+            let dataSample;
+            if (typeof receivedData === 'object' && receivedData !== null) {
+                try {
+                    dataSample = JSON.stringify(receivedData).substring(0, Math.min(JSON.stringify(receivedData).length, 200)) + '...';
+                } catch (e) {
+                    dataSample = String(receivedData).substring(0, Math.min(String(receivedData).length, 200)) + '...';
                 }
+            } else {
+                dataSample = String(receivedData).substring(0, Math.min(String(receivedData).length, 200)) + '...';
             }
-        }
+            addLog(`Amostra do conteúdo (postMessage): ${dataSample}`, 'info');
 
-        function searchAndDisplayJson() {
-            // Inicializa os elementos do DOM aqui, pois o script está no head
-            if (!jsonOutputElement) {
-                jsonOutputElement = document.getElementById("jsonOutput");
-            }
-            if (!statusElement) {
-                statusElement = document.getElementById("status");
-            }
-
-            if (jsonFound || retryCount >= maxRetries) return;
-            
-            retryCount++;
-            if (statusElement) {
-                statusElement.textContent = `Buscando JSON... (tentativa ${retryCount}/${maxRetries})`;
-            }
-            
-            // Tenta encontrar o JSON nos logs já armazenados (para logs que ocorreram antes da inicialização completa)
-            processConsoleLogs();
-
-            if (!jsonFound) {
-                originalConsoleLog(`JSON não encontrado ainda. Tentativa ${retryCount}/${maxRetries}. Tentando novamente em 3 segundos...`);
-                if (retryCount < maxRetries) {
-                    setTimeout(searchAndDisplayJson, 3000);
-                } else {
-                    if (statusElement) {
-                        statusElement.textContent = "Limite de tentativas atingido. JSON não encontrado.";
-                    }
-                }
-            }
-        }
-
-        // Inicia a busca após o DOM ser completamente carregado
-        document.addEventListener('DOMContentLoaded', () => {
-            searchAndDisplayJson();
+            updateAndDisplayData(receivedData, "postMessage");
         });
 
+        // ... (DOMContentLoaded e beforeunload como antes) ...
     </script>
-</head>
-<body>
-    <h1>JSON Recebido do WebView</h1>
-    <div id="status" class="status">Aguardando JSON...</div>
-    <pre id="jsonOutput">Aguardando dados...</pre>
 </body>
 </html>
-
