@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE 2 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -236,23 +236,26 @@
             
             let cleanedDataString = data;
 
-            // Primeira tentativa de remoção de aspas externas e desescapamento
-            // Verifica se a string começa e termina com aspas e se aspas internas estão escapadas
-            if (typeof cleanedDataString === 'string' && cleanedDataString.startsWith('"') && cleanedDataString.endsWith('"') && cleanedDataString.includes('\\"')) {
-                // Remove as aspas externas
+            // Remove aspas externas se a string começar e terminar com elas.
+            // Esta etapa é crucial para lidar com a "dupla stringificação" do FlutterFlow.
+            if (typeof cleanedDataString === 'string' && cleanedDataString.length > 1 && cleanedDataString.startsWith('"') && cleanedDataString.endsWith('"')) {
                 cleanedDataString = cleanedDataString.substring(1, cleanedDataString.length - 1);
                 addLog("Primeiro nível de aspas externas removido.", 'info');
-                
-                // Desescapa as aspas internas (transforma \" em ")
-                cleanedDataString = cleanedDataString.replace(/\\"/g, '"');
-                addLog("Aspas internas desescapadas.", 'info');
-            } else if (typeof cleanedDataString === 'string' && cleanedDataString.startsWith('"') && cleanedDataString.endsWith('"')) {
-                // Caso seja apenas uma string normal que foi stringificada (sem aspas internas escapadas)
-                cleanedDataString = cleanedDataString.substring(1, cleanedDataString.length - 1);
-                addLog("Apenas aspas externas removidas (não havia escapamento interno).", 'info');
-            } else {
-                addLog("Dados recebidos não precisam de limpeza de aspas extras ou não são string inicial.", 'info');
             }
+
+            // Desescapa as aspas internas (transforma \" em ").
+            // Isso precisa acontecer APÓS a remoção das aspas externas.
+            // Use uma regex global para pegar todas as ocorrências.
+            cleanedDataString = cleanedDataString.replace(/\\"/g, '"');
+            addLog("Aspas internas desescapadas.", 'info');
+
+            // O FlutterFlow pode estar enviando strings que são "escapadas"
+            // para serem passadas como argumentos de JavaScript.
+            // Isso significa que outros caracteres como \\ (barra invertida) podem
+            // precisar ser desescapados também, se não fizerem parte do JSON válido.
+            // No entanto, para JSON, o foco principal são as aspas duplas.
+            // Se ainda houver problemas, podemos tentar um 'JSON.parse' aninhado aqui
+            // ou uma lógica de desescapamento mais genérica para barras invertidas.
             
             // >>>>> ADICIONE ESTE NOVO LOG AQUI <<<<<
             // Este log é crucial para vermos a string EXATA que será parseada
