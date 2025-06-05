@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE 2 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -53,31 +53,55 @@
         // DADOS DE EXEMPLO ATUALIZADOS com os valores que você forneceu!
         const initialParsedData = {
             distribuicaoCabos: {
-                "linha_1": 1,
-                "linha_2": 3,
-                "linha_3": 0,
-                "linha_4": 0,
-                "linha_5": 0
+
+// --- CÓDIGO PARA distribuicaoCabos ---
+if (parsedData.distribuicaoCabos) {
+    for (const key in parsedData.distribuicaoCabos) {
+        if (distribuicaoCabos.hasOwnProperty(key)) { // Garante que a chave existe no objeto global
+            distribuicaoCabos[key] = parsedData.distribuicaoCabos[key];
+        }
+    }
+    console.log("distribuicaoCabos atualizado:", distribuicaoCabos);
+} else {
+    console.warn("parsedData.distribuicaoCabos não encontrado.");
+}
             },
             alturaCabos: {
-                "cabo_1": 16,
-                "cabo_2": 14,
-                "cabo_3": 14,
-                "cabo_4": 14,
-                "cabo_5": 0,
-                "cabo_6": 0,
-                "cabo_7": 0,
-                "cabo_8": 0,
-                "cabo_9": 0,
-                "cabo_10": 0,
-                "cabo_11": 0,
-                "cabo_12": 0,
+               
+
+// --- CÓDIGO PARA alturaCabos ---
+if (parsedData.alturaCabos) {
+    for (const key in parsedData.alturaCabos) {
+        if (alturaCabos.hasOwnProperty(key)) { // Garante que a chave existe no objeto global
+            alturaCabos[key] = parsedData.alturaCabos[key];
+        }
+    }
+    console.log("alturaCabos atualizado:", alturaCabos);
+} else {
+    console.warn("parsedData.alturaCabos não encontrado.");
+}
             },
             leiturasTemperatura: {
-                "cabo_1": [10, 12, 15, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
-                "cabo_2": [15, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
-                "cabo_3": [20, 22, 25, 26, 15, 28, 30, 32, 35, 38, 40, 42, 45, 48],
-                "cabo_4": [25, 28, 29, 26, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
+
+// --- CÓDIGO PARA leiturasTemperatura ---
+if (parsedData.leiturasTemperatura) {
+    // Limpa o objeto global antes de preencher, caso os cabos mudem
+    for (const key in leiturasTemperatura) {
+        delete leiturasTemperatura[key];
+    }
+
+    for (const key in parsedData.leiturasTemperatura) {
+        if (Array.isArray(parsedData.leiturasTemperatura[key])) { // Garante que é um array
+            leiturasTemperatura[key] = parsedData.leiturasTemperatura[key];
+        } else {
+            console.warn(`leiturasTemperatura['${key}'] não é um array válido.`);
+        }
+    }
+    console.log("leiturasTemperatura atualizado:", leiturasTemperatura);
+} else {
+    console.warn("parsedData.leiturasTemperatura não encontrado.");
+}
+
             }
         };
 
