@@ -1,4 +1,4 @@
-<!DOCTYPE 2 html>
+<!DOCTYPE 3 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -53,8 +53,8 @@
         // DADOS DE EXEMPLO ATUALIZADOS com os valores que você forneceu!
         const initialParsedData = {
             distribuicaoCabos: {
-
-// --- CÓDIGO PARA distribuicaoCabos ---
+                
+			// --- CÓDIGO PARA distribuicaoCabos ---
 if (parsedData.distribuicaoCabos) {
     for (const key in parsedData.distribuicaoCabos) {
         if (distribuicaoCabos.hasOwnProperty(key)) { // Garante que a chave existe no objeto global
@@ -65,10 +65,10 @@ if (parsedData.distribuicaoCabos) {
 } else {
     console.warn("parsedData.distribuicaoCabos não encontrado.");
 }
+
             },
             alturaCabos: {
-               
-
+                
 // --- CÓDIGO PARA alturaCabos ---
 if (parsedData.alturaCabos) {
     for (const key in parsedData.alturaCabos) {
@@ -80,9 +80,10 @@ if (parsedData.alturaCabos) {
 } else {
     console.warn("parsedData.alturaCabos não encontrado.");
 }
+
             },
             leiturasTemperatura: {
-
+                
 // --- CÓDIGO PARA leiturasTemperatura ---
 if (parsedData.leiturasTemperatura) {
     // Limpa o objeto global antes de preencher, caso os cabos mudem
@@ -101,6 +102,8 @@ if (parsedData.leiturasTemperatura) {
 } else {
     console.warn("parsedData.leiturasTemperatura não encontrado.");
 }
+
+
 
             }
         };
