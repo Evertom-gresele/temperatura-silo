@@ -1,4 +1,4 @@
-<!DOCTYPE 4 html>
+<!DOCTYPE 5 html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -37,7 +37,7 @@
         let objectsToRemove = []; // Array para armazenar objetos a serem removidos na atualização
 
         // Configurações do silo
-        const coneHeight = 8; // Altura do cone superior (AJUSTADO PARA SER MAIS ALTO)
+        const coneHeight = 8; // Altura do cone superior
         const pointSpacing = configuracao.distanciaEntrePontosDeLeitura; // Espaçamento vertical entre pontos de temperatura
 
         // Mapa de cores para interpolação de temperaturas
@@ -50,9 +50,9 @@
             { temp: 60, color: new THREE.Color(0xff0000) }  // Vermelho (quente)
         ];
 
-        // DADOS DE EXEMPLO ATUALIZADOS com os valores que você forneceu!
-        // ESTES SÃO APENAS DADOS INICIAIS, SERÃO SOBRESCRITOS PELOS DADOS DO FLUTTERFLOW
-        const initialParsedData = {
+        // DADOS DE EXEMPLO - ESTES SERÃO APENAS USADOS NA INICIALIZAÇÃO SE NENHUM DADO FOR ENVIADO
+        // O `updateGraphData` irá desenhar com os dados recebidos.
+        const defaultInitialData = {
             distribuicaoCabos: {
                 "linha_1": 1,
                 "linha_2": 3,
@@ -102,28 +102,25 @@
         }
 
         // Função para criar os cabos e pontos de temperatura
-        function createSiloCables(dataFromParsed, siloHeightOffset) { // Renomeado para clareza
-            // Esta função agora usa os dados passados como argumento
-            const distribuicaoCabosLocal = dataFromParsed.distribuicaoCabos;
-            const alturaCabosLocal = dataFromParsed.alturaCabos;
-            const leiturasTemperaturaLocal = dataFromParsed.leiturasTemperatura;
+        // Esta função agora SEMPRE usará o objeto de dados que lhe for passado.
+        function createSiloCables(dataToRender, siloHeightOffset) {
+            const distribuicaoCabos = dataToRender.distribuicaoCabos;
+            const alturaCabos = dataToRender.alturaCabos;
+            const leiturasTemperatura = dataToRender.leiturasTemperatura;
 
             let currentCableIndex = 0;
             
-            // Loop para linha_1 a linha_5
-            for (let i = 1; i <= 5; i++) { // i representa o número da linha concêntrica (1 para central, 2 para o primeiro anel, etc.)
-                const numCablesInLine = distribuicaoCabosLocal[`linha_${i}`] || 0;
+            for (let i = 1; i <= 5; i++) {
+                const numCablesInLine = distribuicaoCabos[`linha_${i}`] || 0;
                 
                 if (numCablesInLine > 0) {
                     let cableRadius;
                     if (i === 1) { // Linha 1 (central)
-                        cableRadius = 0; // O cabo central fica no raio 0
+                        cableRadius = 0;
                     } else { // Outras linhas formam anéis
-                        // O raio de cada anel é (número da linha - 1) * distanciaEntreAneisDeCabos
                         cableRadius = (i - 1) * configuracao.distanciaEntreAneisDeCabos;
                     }
                     
-                    // Se o raio for 0 (cabo central), definimos um valor minúsculo para evitar divisão por zero na angleStep
                     const effectiveNumCablesInLine = (cableRadius === 0 && numCablesInLine === 1) ? 1 : numCablesInLine;
                     const angleStep = (2 * Math.PI) / effectiveNumCablesInLine;
 
@@ -135,13 +132,13 @@
                             cableX = 0;
                             cableZ = 0;
                         } else { // Cabos em anéis
-                            const cableAngle = j * angleStep; // Começa sempre do mesmo ângulo para cada anel
+                            const cableAngle = j * angleStep;
                             cableX = Math.cos(cableAngle) * cableRadius;
                             cableZ = Math.sin(cableAngle) * cableRadius;
                         }
 
-                        const numPoints = alturaCabosLocal[`cabo_${currentCableIndex}`] || 0;
-                        const temperatures = leiturasTemperaturaLocal[`cabo_${currentCableIndex}`] || [];
+                        const numPoints = alturaCabos[`cabo_${currentCableIndex}`] || 0;
+                        const temperatures = leiturasTemperatura[`cabo_${currentCableIndex}`] || [];
 
                         // Cria o cabo (linha)
                         const cableMaterial = new THREE.LineBasicMaterial({ color: 0x888888 });
@@ -151,7 +148,7 @@
                         ]);
                         const cableLine = new THREE.Line(cableGeometry, cableMaterial);
                         scene.add(cableLine);
-                        objectsToRemove.push(cableLine); // Adiciona para remoção futura
+                        objectsToRemove.push(cableLine);
 
                         // Cria os pontos de temperatura
                         for (let k = 0; k < numPoints; k++) {
@@ -159,28 +156,26 @@
                             const pointY = siloHeightOffset + k * pointSpacing;
                             const pointColor = getColorForTemperature(temp);
 
-                            // Usa o novo campo de configuração para o diâmetro da esfera
                             const pointGeometry = new THREE.SphereGeometry(configuracao.diametroDeExibicaoDaTemperatura / 2, 16, 16);
                             const pointMaterial = new THREE.MeshBasicMaterial({ color: pointColor });
                             const pointMesh = new THREE.Mesh(pointGeometry, pointMaterial);
                             pointMesh.position.set(cableX, pointY, cableZ);
                             scene.add(pointMesh);
-                            objectsToRemove.push(pointMesh); // Adiciona para remoção futura
+                            objectsToRemove.push(pointMesh);
 
                             // Adicionar texto da temperatura
                             if (loadedFont && temp !== 0) {
                                 const textMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
                                 const textGeometry = new THREE.TextGeometry(temp.toString(), {
                                     font: loadedFont,
-                                    size: configuracao.tamanhoDaFonteDeTemperatura, // Usa o novo campo de configuração para o tamanho da fonte
+                                    size: configuracao.tamanhoDaFonteDeTemperatura,
                                     height: 0.1,
                                 });
                                 textGeometry.computeBoundingBox();
                                 const textWidth = textGeometry.boundingBox.max.x - textGeometry.boundingBox.min.x;
                                 const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-                                // Ajuste a posição do texto para ficar ao lado da esfera
                                 textMesh.position.set(cableX + configuracao.diametroDeExibicaoDaTemperatura / 2 + 0.1, pointY, cableZ);
-                                objectsToRemove.push(textMesh); // Adiciona para remoção futura
+                                objectsToRemove.push(textMesh);
                                 scene.add(textMesh);
                             }
                         }
@@ -234,7 +229,8 @@
             fontLoader.load('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/fonts/helvetiker_regular.typeface.json', function (font) {
                 loadedFont = font;
                 console.log("Fonte carregada.");
-                updateGraphData(JSON.stringify(initialParsedData)); 
+                // Na inicialização, usamos os dados default para que algo apareça
+                updateGraphData(JSON.stringify(defaultInitialData)); 
             });
             
             // Variáveis globais para as dimensões do silo e offset inicial
@@ -316,71 +312,25 @@
                     side: THREE.DoubleSide
                 });
 
-                // --- CÓDIGO PARA distribuicaoCabos - COLOCADO AQUI, NO LUGAR CERTO ---
-                if (parsedData.distribuicaoCabos) {
-                    for (const key in parsedData.distribuicaoCabos) {
-                        // Garante que a chave existe no objeto global antes de atribuir
-                        if (initialParsedData.distribuicaoCabos.hasOwnProperty(key)) { 
-                            initialParsedData.distribuicaoCabos[key] = parsedData.distribuicaoCabos[key];
-                        }
-                    }
-                    console.log("distribuicaoCabos atualizado (global):", initialParsedData.distribuicaoCabos);
-                } else {
-                    console.warn("parsedData.distribuicaoCabos não encontrado.");
-                }
-
-                // --- CÓDIGO PARA alturaCabos - COLOCADO AQUI, NO LUGAR CERTO ---
-                if (parsedData.alturaCabos) {
-                    for (const key in parsedData.alturaCabos) {
-                        // Garante que a chave existe no objeto global antes de atribuir
-                        if (initialParsedData.alturaCabos.hasOwnProperty(key)) {
-                            initialParsedData.alturaCabos[key] = parsedData.alturaCabos[key];
-                        }
-                    }
-                    console.log("alturaCabos atualizado (global):", initialParsedData.alturaCabos);
-                } else {
-                    console.warn("parsedData.alturaCabos não encontrado.");
-                }
-
-                // --- CÓDIGO PARA leiturasTemperatura - COLOCADO AQUI, NO LUGAR CERTO ---
-                if (parsedData.leiturasTemperatura) {
-                    // Limpa o objeto global antes de preencher, caso os cabos mudem dinamicamente
-                    for (const key in initialParsedData.leiturasTemperatura) {
-                        delete initialParsedData.leiturasTemperatura[key];
-                    }
-
-                    for (const key in parsedData.leiturasTemperatura) {
-                        if (Array.isArray(parsedData.leiturasTemperatura[key])) { // Garante que é um array
-                            initialParsedData.leiturasTemperatura[key] = parsedData.leiturasTemperatura[key];
-                        } else {
-                            console.warn(`leiturasTemperatura['${key}'] não é um array válido.`);
-                        }
-                    }
-                    console.log("leiturasTemperatura atualizado (global):", initialParsedData.leiturasTemperatura);
-                } else {
-                    console.warn("parsedData.leiturasTemperatura não encontrado.");
-                }
-
-
-                // Obter novo raio e altura a partir dos dados ATUALIZADOS
+                // --- AGORA TODOS OS CÁLCULOS ABAIXO USARÃO parsedData DIRETAMENTE ---
                 let newMaxCableHeight = 0;
-                let numberOfActiveLines = 0; // Para calcular o raio do silo
+                let numberOfActiveLines = 0;
 
-                // IMPORTANTE: Agora, use initialParsedData.distribuicaoCabos para calcular numberOfActiveLines
+                // Loop para calcular numberOfActiveLines a partir dos DADOS RECEBIDOS
                 for (let i = 1; i <= 5; i++) {
-                    const numCablesInLine = initialParsedData.distribuicaoCabos[`linha_${i}`] || 0;
+                    const numCablesInLine = parsedData.distribuicaoCabos[`linha_${i}`] || 0;
                     if (numCablesInLine > 0) {
-                        numberOfActiveLines++; // Contamos as linhas ativas
+                        numberOfActiveLines++;
                     }
                 }
 
                 let currentCableIndexCheck = 0;
-                // IMPORTANTE: Agora, use initialParsedData.distribuicaoCabos e initialParsedData.alturaCabos
+                // Loop para calcular newMaxCableHeight a partir dos DADOS RECEBIDOS
                 for (let i = 1; i <= 5; i++) {
-                    const numCablesInLine = initialParsedData.distribuicaoCabos[`linha_${i}`] || 0;
+                    const numCablesInLine = parsedData.distribuicaoCabos[`linha_${i}`] || 0;
                     for (let j = 0; j < numCablesInLine; j++) {
                         currentCableIndexCheck++;
-                        const alturaDoCabo = initialParsedData.alturaCabos[`cabo_${currentCableIndexCheck}`] || 0;
+                        const alturaDoCabo = parsedData.alturaCabos[`cabo_${currentCableIndexCheck}`] || 0;
                         if (alturaDoCabo > newMaxCableHeight) {
                             newMaxCableHeight = alturaDoCabo;
                         }
@@ -390,57 +340,39 @@
                 // Garante que a altura mínima do cilindro seja razoável
                 if (newMaxCableHeight === 0) newMaxCableHeight = 10; 
 
-                const basePlateHeight = 1; // Já é uma constante global
-                const cylinderOffsetFromBase = basePlateHeight; // Os cabos começam acima da base
-                // CORRIGIDO: newSiloCylinderHeight agora usa pointSpacing
-                const newSiloCylinderHeight = newMaxCableHeight * pointSpacing; // A altura do cilindro é baseada na altura máxima dos cabos.
-                                                                                // O offset da base é tratado na posição Y.
+                const basePlateHeight = 1;
+                const cylinderOffsetFromBase = basePlateHeight;
+                const newSiloCylinderHeight = newMaxCableHeight * pointSpacing;
 
                 let currentSiloRadius = 0;
                 if (numberOfActiveLines === 0) {
-                    currentSiloRadius = configuracao.distanciaDoUltimoAnelDaParede; // Raio padrão se não houver cabos
-                } else if (numberOfActiveLines === 1 && initialParsedData.distribuicaoCabos["linha_1"] === 1) {
-                    // Apenas cabo central: raio do silo = distanciaDoUltimoAnelDaParede (5)
+                    currentSiloRadius = configuracao.distanciaDoUltimoAnelDaParede;
+                } else if (numberOfActiveLines === 1 && parsedData.distribuicaoCabos["linha_1"] === 1) {
                     currentSiloRadius = configuracao.distanciaDoUltimoAnelDaParede;
                 }
                  else {
-                    // Raio do último anel de cabos = (numberOfActiveLines - 1) * distanciaEntreAneisDeCabos
-                    // Raio do silo = Raio do último anel + distanciaDoUltimoAnelDaParede
                     currentSiloRadius = (numberOfActiveLines - 1) * configuracao.distanciaEntreAneisDeCabos + configuracao.distanciaDoUltimoAnelDaParede;
                 }
 
                 // Atualiza o cilindro do silo
                 siloMesh.geometry.dispose();
                 siloMesh.geometry = new THREE.CylinderGeometry(currentSiloRadius, currentSiloRadius, newSiloCylinderHeight, 32);
-                siloMesh.position.y = (newSiloCylinderHeight / 2) + basePlateHeight; // Posiciona acima da base
-                siloMesh.material = siloMaterial; // Garante que o material está aplicado
+                siloMesh.position.y = (newSiloCylinderHeight / 2) + basePlateHeight;
+                siloMesh.material = siloMaterial;
 
                 // Atualiza o cone superior
                 siloTopCone.geometry.dispose();
                 siloTopCone.geometry = new THREE.ConeGeometry(currentSiloRadius, coneHeight, 32);
                 siloTopCone.position.y = newSiloCylinderHeight + basePlateHeight + (coneHeight / 2);
-                siloTopCone.material = siloMaterial; // Garante que o material está aplicado
+                siloTopCone.material = siloMaterial;
 
-                // Atualiza a placa da base (se o raio do silo mudou, a base também deve mudar)
+                // Atualiza a placa da base
                 siloBasePlate.geometry.dispose();
                 siloBasePlate.geometry = new THREE.CylinderGeometry(currentSiloRadius + 1, currentSiloRadius + 1, basePlateHeight, 32);
                 siloBasePlate.position.y = 0;
-                // O material da base não muda, então não precisamos atribuir novamente
-
-                // Chamar createSiloCables. Agora, `createSiloCables` deve usar initialParsedData
-                // ou ser ajustada para receber os dados individualmente.
-                // Vou ajustar `createSiloCables` para usar os objetos globais initialParsedData.
-                // OU, como `parsedData` já é o objeto completo, podemos passá-lo.
-                // Mantenha `createSiloCables(parsedData, cylinderOffsetFromBase);` se ela estiver
-                // lendo `parsedData.distribuicaoCabos` etc.
-                // Se a função `createSiloCables` foi ajustada para usar as variáveis globais
-                // (como `distribuicaoCabos`, `alturaCabos`, `leiturasTemperatura`),
-                // então a chamada seria `createSiloCables(cylinderOffsetFromBase);`
-                // No entanto, seu código original usa `parsedData`, então vou manter isso.
-                // O importante é que os objetos globais `initialParsedData.distribuicaoCabos`, etc.
-                // foram atualizados ANTES desta chamada.
                 
-                createSiloCables(parsedData, cylinderOffsetFromBase); // Mantendo como está no seu código original
+                // CHAMA createSiloCables PASSANDO OS DADOS REAIS DO FLUTTERFLOW (parsedData)
+                createSiloCables(parsedData, cylinderOffsetFromBase);
 
                 // A altura total visual do silo (para o AxesHelper e câmera)
                 const totalSiloVisualHeight = newSiloCylinderHeight + coneHeight + basePlateHeight;
@@ -451,11 +383,11 @@
                     axesHelper.geometry.dispose();
                 }
                 axesHelper = new THREE.AxesHelper(Math.max(currentSiloRadius * 1.5, totalSiloVisualHeight));
-                axesHelper.position.y = totalSiloVisualHeight / 2 - basePlateHeight; // Centraliza no meio da altura total do silo, ajustado pela base
+                axesHelper.position.y = totalSiloVisualHeight / 2 - basePlateHeight;
                 scene.add(axesHelper);
 
                 // Ajusta o target dos controles e a posição da câmera
-                controls.target.set(0, totalSiloVisualHeight / 2, 0); // O target deve ser o centro vertical do silo
+                controls.target.set(0, totalSiloVisualHeight / 2, 0);
                 camera.position.set(currentSiloRadius * 2.5, controls.target.y + currentSiloRadius, currentSiloRadius * 2.5);
                 controls.update();
                 
