@@ -1,176 +1,99 @@
-<!DOCTYPE 2 html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSON do WebView</title>
+    <title>Receptor Simples WebView</title>
     <style>
         body {
-            font-family: monospace;
+            font-family: Arial, sans-serif;
             margin: 20px;
-            background-color: #f5f5f5;
+            background-color: #e0f7fa; /* Cor de fundo leve para visualização */
+            color: #004d40;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 90vh; /* Ocupa a maior parte da tela */
         }
         h1 {
-            color: #333;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 10px;
+            color: #00796b;
+            text-align: center;
+            margin-bottom: 20px;
         }
         pre {
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 15px;
-            white-space: pre-wrap;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            white-space: pre-wrap; /* Permite quebras de linha longas */
+            word-wrap: break-word; /* Quebra palavras longas */
+            max-width: 90%; /* Limita a largura para melhor visualização */
             overflow-x: auto;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #b2dfdb;
+            font-size: 0.9em;
         }
-        .status {
-            color: #666;
-            font-style: italic;
-            margin-bottom: 10px;
+        #status-message {
+            font-weight: bold;
+            color: #d84315; /* Cor de alerta */
+            margin-bottom: 15px;
+            padding: 8px;
+            background-color: #ffe0b2; /* Fundo de alerta */
+            border-radius: 5px;
         }
         .success {
-            color: green;
+            color: #388e3c; /* Cor de sucesso */
+            background-color: #c8e6c9; /* Fundo de sucesso */
         }
     </style>
 </head>
 <body>
-    <h1>JSON Recebido do WebView</h1>
-    <div id="status" class="status">Aguardando JSON...</div>
-    <pre id="jsonOutput">Aguardando dados...</pre>
+    <h1>Dados Recebidos pelo WebView</h1>
+    <div id="status-message">Aguardando dados...</div>
+    <pre id="received-data-output">Nenhum dado recebido ainda.</pre>
 
     <script>
-        // Função para receber o JSON diretamente do FlutterFlow via evaluateJavascript (como window.updateGraphData ou window.handleWebViewJson)
-        window.handleWebViewJson = function(jsonData) {
-            console.log('handleWebViewJson: Dados recebidos diretamente:', jsonData); // Loga o que foi recebido!
-            const jsonOutputElement = document.getElementById("jsonOutput");
-            const statusElement = document.getElementById("status");
-            
-            if (jsonOutputElement && statusElement) {
-                let displayContent;
-                if (typeof jsonData === 'object' && jsonData !== null) {
+        // Esta é a ÚNICA função JavaScript que o FlutterFlow precisa chamar.
+        // Ela vai receber os dados e exibi-los na tela e no console do NAVEGADOR.
+        window.handleWebViewJson = function(data) {
+            console.log('handleWebViewJson: Dados recebidos. Tipo:', typeof data, 'Conteúdo:', data);
+
+            const statusMessage = document.getElementById('status-message');
+            const outputElement = document.getElementById('received-data-output');
+
+            if (statusMessage && outputElement) {
+                let contentToDisplay;
+                // Tenta formatar como JSON bonito se for um objeto ou uma string JSON
+                if (typeof data === 'object' && data !== null) {
                     try {
-                        displayContent = JSON.stringify(jsonData, null, 2);
+                        contentToDisplay = JSON.stringify(data, null, 2);
+                        console.log('handleWebViewJson: Dados eram objeto, stringificado para JSON.');
                     } catch (e) {
-                        displayContent = String(jsonData) + '\n(Erro ao formatar JSON: ' + e.message + ')';
-                        console.error('handleWebViewJson: Erro ao stringify JSON:', e);
+                        contentToDisplay = String(data) + '\n(Erro ao formatar objeto JSON: ' + e.message + ')';
+                        console.error('handleWebViewJson: Erro ao stringify o objeto:', e);
                     }
                 } else {
-                    // Se o dado não é um objeto (ex: já é uma string JSON), tenta parsear e formatar
+                    // Se já for uma string, tenta parsear e formatar como JSON
                     try {
-                        const parsedData = JSON.parse(jsonData);
-                        displayContent = JSON.stringify(parsedData, null, 2);
+                        const parsedData = JSON.parse(data);
+                        contentToDisplay = JSON.stringify(parsedData, null, 2);
+                        console.log('handleWebViewJson: Dados eram string, tentando parsear e formatar como JSON.');
                     } catch (e) {
-                        displayContent = String(jsonData) + '\n(Dado não é JSON válido ou objeto)';
-                        console.warn('handleWebViewJson: Dados não são um objeto ou JSON válido, exibindo como string.', e);
+                        // Se não for objeto nem string JSON válida, exibe como string bruta
+                        contentToDisplay = String(data) + '\n(Não é um objeto nem JSON válido)';
+                        console.warn('handleWebViewJson: Dados não são JSON válido nem objeto, exibindo como string bruta.');
                     }
                 }
-
-                jsonOutputElement.textContent = displayContent;
-                statusElement.textContent = "JSON recebido diretamente da WebView!";
-                statusElement.classList.add("success");
+                
+                outputElement.textContent = contentToDisplay;
+                statusMessage.textContent = 'Dados Recebidos com Sucesso!';
+                statusMessage.className = 'success'; // Adiciona classe para mudar cor
             } else {
-                console.warn('handleWebViewJson: Elementos DOM não encontrados para atualização.');
+                console.error('handleWebViewJson: Elementos DOM (status-message ou received-data-output) não encontrados. Verifique o HTML.');
             }
         };
 
-        // Função para buscar o JSON no console (interceptando console.log)
-        // ATENÇÃO: Esta abordagem é mais frágil e normalmente não é recomendada para produção.
-        // A função 'print' do Flutter envia para o console do Flutter/Dart, não necessariamente para o console JavaScript do WebView.
-        // A função abaixo TENTA interceptar, mas pode não funcionar para logs vindos do Dart/Flutter diretamente.
-        (function() {
-            const targetString = "JSON final enviado para o WebView:";
-            let jsonFoundInConsole = false; // Renomeado para evitar conflito e clareza
-            let retryCount = 0;
-            const maxRetries = 20;
-            const consoleLogs = []; // Array para armazenar logs capturados
-
-            // Sobrescreve o console.log para capturar as mensagens
-            const originalConsoleLog = console.log;
-            console.log = function(...args) {
-                originalConsoleLog.apply(console, args); // Garante que o log original ainda funcione
-                
-                if (jsonFoundInConsole) return; // Se já encontrou, não precisa mais processar logs
-
-                // Converte todos os argumentos para uma única string para processamento
-                const logString = args.map(arg => {
-                    if (typeof arg === 'object') {
-                        try {
-                            return JSON.stringify(arg);
-                        } catch (e) {
-                            return String(arg); // Fallback para objetos complexos
-                        }
-                    }
-                    return String(arg);
-                }).join(" ");
-                
-                consoleLogs.push(logString); // Armazena o log
-
-                // Processa o log imediatamente ao ser capturado
-                if (logString.includes(targetString)) {
-                    try {
-                        // Regex para extrair o JSON: busca a string alvo seguida por espaços e um objeto JSON {...}
-                        const match = logString.match(new RegExp(targetString + '\\s*(\\{[\\s\\S]*\\})'));
-                        if (match && match[1]) {
-                            const jsonData = JSON.parse(match[1]); // Tenta fazer o parse do JSON extraído
-                            const jsonOutputElement = document.getElementById("jsonOutput");
-                            const statusElement = document.getElementById("status");
-                            
-                            if (jsonOutputElement && statusElement) {
-                                jsonOutputElement.textContent = JSON.stringify(jsonData, null, 2);
-                                statusElement.textContent = "JSON encontrado e processado via interceptação do console!";
-                                statusElement.classList.add("success");
-                                jsonFoundInConsole = true; // Marca como encontrado
-                                originalConsoleLog("JSON encontrado e exibido com sucesso via console interceptado!");
-                            }
-                        }
-                    } catch (e) {
-                        originalConsoleLog("Erro ao processar JSON da interceptação do console:", e);
-                    }
-                }
-            };
-
-            // Função que tenta buscar o JSON nos logs capturados ou no console (recursivamente)
-            function searchAndDisplayJsonFromCapturedLogs() {
-                if (jsonFoundInConsole || retryCount >= maxRetries) {
-                    if (retryCount >= maxRetries && !jsonFoundInConsole) {
-                        const statusElement = document.getElementById("status");
-                        if (statusElement) {
-                            statusElement.textContent = "Limite de tentativas de busca no console atingido. JSON não encontrado por essa via.";
-                            console.error('searchAndDisplayJsonFromCapturedLogs: Limite de tentativas atingido. JSON não encontrado.');
-                        }
-                    }
-                    return;
-                }
-                
-                retryCount++;
-                const statusElement = document.getElementById("status");
-                if (statusElement) {
-                    statusElement.textContent = `Buscando JSON no console... (tentativa ${retryCount}/${maxRetries})`;
-                }
-                
-                // Reprocessa todos os logs armazenados (principalmente para logs que ocorreram antes do DOMContentLoaded)
-                for (const log of consoleLogs) {
-                    if (log.includes(targetString) && !jsonFoundInConsole) {
-                        // Re-chamar a lógica de interceptação para garantir que o JSON seja processado
-                        // (o console.log sobrescrito já faz a maior parte do trabalho, mas garante que o DOM seja atualizado).
-                        // Esta parte é mais um fallback, o principal é o console.log interceptado.
-                        // Basicamente, força a reavaliação de logs antigos.
-                    }
-                }
-
-                if (!jsonFoundInConsole) {
-                    originalConsoleLog(`JSON não encontrado ainda via interceptação. Tentativa ${retryCount}/${maxRetries}. Tentando novamente em 1 segundo...`);
-                    if (retryCount < maxRetries) {
-                        setTimeout(searchAndDisplayJsonFromCapturedLogs, 1000);
-                    }
-                }
-            }
-
-            // Inicia a busca imediatamente após o script ser executado
-            // (pode ser antes de alguns logs aparecerem, por isso o setTimeout e o array consoleLogs).
-            searchAndDisplayJsonFromCapturedLogs();
-        })();
+        console.log('HTML do WebView carregado. Aguardando chamada handleWebViewJson...');
     </script>
 </body>
 </html>
